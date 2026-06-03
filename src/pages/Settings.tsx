@@ -28,6 +28,7 @@ import {
   Save
 } from 'lucide-react'
 import { useStore } from '@/store'
+import { toast } from '@/components/ui/toast'
 
 // 密码强度类型
 type PasswordStrength = 'weak' | 'medium' | 'strong'
@@ -273,9 +274,9 @@ export default function Settings() {
         await storeState.loadUser()
       }
 
-      alert('头像上传成功！')
+      toast('头像上传成功！')
     } catch (error: any) {
-      alert('上传失败: ' + error.message)
+      toast('上传失败: ' + error.message, 'error')
     } finally {
       setUploading(false)
     }
@@ -284,7 +285,7 @@ export default function Settings() {
   // 处理浏览器通知开关
   const handleBrowserNotificationChange = async (checked: boolean) => {
     if (!('Notification' in window)) {
-      alert('您的浏览器不支持通知功能')
+      toast('您的浏览器不支持通知功能', 'warning')
       return
     }
 
@@ -301,14 +302,14 @@ export default function Settings() {
           icon: '/favicon.ico'
         })
       } else if (permission === 'denied') {
-        alert('通知权限被拒绝，请在浏览器设置中允许通知')
+        toast('通知权限被拒绝，请在浏览器设置中允许通知', 'warning')
         setBrowserNotification(false)
       } else {
         setBrowserNotification(false)
       }
     } else {
       setBrowserNotification(false)
-      alert('已关闭浏览器通知。如需重新启用，请点击开关并允许通知权限。')
+      toast('已关闭浏览器通知。如需重新启用，请点击开关并允许通知权限。', 'info')
     }
   }
 
@@ -350,9 +351,9 @@ export default function Settings() {
       
       setTwoStepEnabled(true)
       setShow2FADialog(false)
-      alert('两步验证已启用！下次登录时需要输入验证码。')
+      toast('两步验证已启用！下次登录时需要输入验证码。', 'success')
     } catch (error: any) {
-      alert('启用两步验证失败: ' + error.message)
+      toast('启用两步验证失败: ' + error.message, 'error')
     }
   }
 
@@ -367,9 +368,9 @@ export default function Settings() {
       if (error) throw error
       
       setTwoStepEnabled(false)
-      alert('两步验证已关闭。')
+      toast('两步验证已关闭。', 'success')
     } catch (error: any) {
-      alert('关闭两步验证失败: ' + error.message)
+      toast('关闭两步验证失败: ' + error.message, 'error')
     }
   }
 
@@ -398,24 +399,24 @@ export default function Settings() {
     const cfp = (document.getElementById('confirmPassword') as HTMLInputElement)?.value
     
     if (!cp || !np || !cfp) { 
-      alert('请填写所有密码字段') 
+      toast('请填写所有密码字段', 'warning')
       return 
     }
     if (np !== cfp) { 
-      alert('两次输入的新密码不一致') 
+      toast('两次输入的新密码不一致', 'warning')
       return 
     }
     if (np.length < 6) { 
-      alert('密码长度至少6位') 
+      toast('密码长度至少6位', 'warning')
       return 
     }
     
     const { supabase: sb } = await import('@/db/supabase')
     const { error } = await sb.auth.updateUser({ password: np })
     if (error) { 
-      alert('修改失败: ' + error.message) 
+      toast('修改失败: ' + error.message, 'error')
     } else {
-      alert('密码修改成功')
+      toast('密码修改成功', 'success')
       ;(document.getElementById('currentPassword') as HTMLInputElement).value = ''
       ;(document.getElementById('newPassword') as HTMLInputElement).value = ''
       ;(document.getElementById('confirmPassword') as HTMLInputElement).value = ''
