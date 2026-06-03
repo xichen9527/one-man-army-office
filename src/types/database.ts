@@ -194,6 +194,7 @@ export type FollowupUpdate = Partial<Omit<Followup, 'id' | 'user_id' | 'created_
 // ==================== CRM ====================
 export interface Customer {
   id: string
+  owner_id: string
   name: string
   email: string | null
   phone: string | null
@@ -210,10 +211,11 @@ export interface Customer {
   updated_at: string
 }
 export type CustomerInsert = Omit<Customer, 'id' | 'created_at' | 'updated_at'>
-export type CustomerUpdate = Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>
+export type CustomerUpdate = Partial<Omit<Customer, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
 
 export interface SalesOpportunity {
   id: string
+  owner_id: string
   customer_id: string
   title: string
   stage: 'initial' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
@@ -227,7 +229,7 @@ export interface SalesOpportunity {
   updated_at: string
 }
 export type SalesOpportunityInsert = Omit<SalesOpportunity, 'id' | 'created_at' | 'updated_at'>
-export type SalesOpportunityUpdate = Partial<Omit<SalesOpportunity, 'id' | 'customer_id' | 'created_at' | 'updated_at'>>
+export type SalesOpportunityUpdate = Partial<Omit<SalesOpportunity, 'id' | 'owner_id' | 'customer_id' | 'created_at' | 'updated_at'>>
 
 // ==================== Social ====================
 export interface SocialAccount {

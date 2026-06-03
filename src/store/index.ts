@@ -178,6 +178,10 @@ export const useStore = create<AppState>((set, get) => ({
         // 登录后自动建立 realtime 订阅
         get().subscribeToConferences()
         get().subscribeToNotifications(session.user.id)
+        get().subscribeToProjects()
+        get().subscribeToTasks()
+        get().subscribeToDocuments()
+        get().subscribeToCRM()
         if (get().activeChannel) get().subscribeToMessages(get().activeChannel)
       } else {
         set({ currentUser: null, isAuthenticated: false, loading: false })
@@ -201,6 +205,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   signOut: async () => {
     get().unsubscribeMessages()
+    get().unsubscribeData()
     set((s: any) => {
       if (s.__conferenceChannel) supabase.removeChannel(s.__conferenceChannel)
       if (s.__notificationChannel) supabase.removeChannel(s.__notificationChannel)
@@ -218,7 +223,11 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Projects ==========
   projects: [],
   fetchProjects: async () => {
-    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('projects')
+      .select('*').eq('owner_id', user.user.id)
+      .order('created_at', { ascending: false })
     set({ projects: (data as Project[] | null) || [] })
   },
   addProject: async (p) => {
@@ -245,7 +254,11 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Tasks ==========
   tasks: [],
   fetchTasks: async () => {
-    const { data } = await supabase.from('tasks').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('tasks')
+      .select('*').eq('creator_id', user.user.id)
+      .order('created_at', { ascending: false })
     set({ tasks: (data as Task[] | null) || [] })
   },
   addTask: async (t) => {
@@ -272,7 +285,11 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Documents ==========
   documents: [],
   fetchDocuments: async (projectId) => {
-    let query = supabase.from('documents').select('*').order('updated_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    let query = supabase.from('documents')
+      .select('*').eq('creator_id', user.user.id)
+      .order('updated_at', { ascending: false })
     if (projectId) query = query.eq('project_id', projectId)
     const { data } = await query
     set({ documents: (data as Document[] | null) || [] })
@@ -303,7 +320,11 @@ export const useStore = create<AppState>((set, get) => ({
   messages: {},
   activeChannel: null,
   fetchChannels: async () => {
-    const { data } = await supabase.from('channels').select('*').order('created_at')
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('channels')
+      .select('*').eq('created_by', user.user.id)
+      .order('created_at')
     set({ channels: (data as Channel[] | null) || [] })
     const state = get()
     if (data && data.length > 0 && !state.activeChannel) {
@@ -461,12 +482,18 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== CRM ==========
   customers: [],
   fetchCustomers: async () => {
-    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('customers')
+      .select('*').eq('owner_id', user.user.id)
+      .order('created_at', { ascending: false })
     set({ customers: (data as Customer[] | null) || [] })
   },
   addCustomer: async (c) => {
     try {
-      const { data } = await supabase.from('customers').insert(c as any).select().single()
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data } = await supabase.from('customers').insert({ ...c, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ customers: [data as Customer, ...s.customers] }))
     } catch (e) { console.error('addCustomer failed:', e) }
   },
@@ -484,12 +511,18 @@ export const useStore = create<AppState>((set, get) => ({
   },
   salesOpportunities: [],
   fetchSalesOpportunities: async () => {
-    const { data } = await supabase.from('sales_opportunities').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('sales_opportunities')
+      .select('*').eq('owner_id', user.user.id)
+      .order('created_at', { ascending: false })
     set({ salesOpportunities: (data as SalesOpportunity[] | null) || [] })
   },
   addOpportunity: async (o) => {
     try {
-      const { data } = await supabase.from('sales_opportunities').insert(o as any).select().single()
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data } = await supabase.from('sales_opportunities').insert({ ...o, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ salesOpportunities: [data as SalesOpportunity, ...s.salesOpportunities] }))
     } catch (e) { console.error('addOpportunity failed:', e) }
   },
@@ -505,7 +538,11 @@ export const useStore = create<AppState>((set, get) => ({
   aiMessages: {},
   activeAIConv: null,
   fetchAIConversations: async () => {
-    const { data } = await supabase.from('ai_conversations').select('*').order('updated_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('ai_conversations')
+      .select('*').eq('user_id', user.user.id)
+      .order('updated_at', { ascending: false })
     set({ aiConversations: (data as AIConversation[] | null) || [] })
   },
   fetchAIMessages: async (convId) => {
@@ -733,7 +770,11 @@ export const useStore = create<AppState>((set, get) => ({
   socialPosts: [],
   trendingTopics: [],
   fetchSocialAccounts: async () => {
-    const { data } = await supabase.from('social_accounts').select('*').order('created_at')
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('social_accounts')
+      .select('*').eq('user_id', user.user.id)
+      .order('created_at')
     set({ socialAccounts: (data as SocialAccount[] | null) || [] })
   },
   fetchSocialPosts: async (accountId) => {
@@ -877,7 +918,11 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Video Conference ==========
   conferences: [],
   fetchConferences: async () => {
-    const { data } = await supabase.from('video_conferences').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('video_conferences')
+      .select('*').eq('host_id', user.user.id)
+      .order('created_at', { ascending: false })
     set({ conferences: (data as Conference[] | null) || [] })
   },
   addConference: async (c) => {
@@ -930,7 +975,11 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Files ==========
   files: [],
   fetchFiles: async (projectId) => {
-    let query = supabase.from('files').select('*').order('created_at', { ascending: false })
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    let query = supabase.from('files')
+      .select('*').eq('uploaded_by', user.user.id)
+      .order('created_at', { ascending: false })
     if (projectId) query = query.eq('project_id', projectId)
     const { data } = await query
     set({ files: (data as DBFile[] | null) || [] })
@@ -1074,6 +1123,77 @@ export const useStore = create<AppState>((set, get) => ({
         .subscribe()
       return { __notificationChannel: ch } as any
     })
+  },
+
+  // ========== Data Realtime Subscriptions ==========
+  // Projects realtime — refreshes project list on any project change
+  subscribeToProjects: () => {
+    set((s) => {
+      if ((s as any).__projectsChannel) return s
+      const ch = supabase
+        .channel('projects-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+          get().fetchProjects()
+        })
+        .subscribe()
+      return { __projectsChannel: ch } as any
+    })
+  },
+
+  // Tasks realtime
+  subscribeToTasks: () => {
+    set((s) => {
+      if ((s as any).__tasksChannel) return s
+      const ch = supabase
+        .channel('tasks-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+          get().fetchTasks()
+        })
+        .subscribe()
+      return { __tasksChannel: ch } as any
+    })
+  },
+
+  // Documents realtime
+  subscribeToDocuments: () => {
+    set((s) => {
+      if ((s as any).__documentsChannel) return s
+      const ch = supabase
+        .channel('documents-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+          get().fetchDocuments()
+        })
+        .subscribe()
+      return { __documentsChannel: ch } as any
+    })
+  },
+
+  // CRM realtime — customers and opportunities
+  subscribeToCRM: () => {
+    set((s) => {
+      if ((s as any).__crmChannel) return s
+      const ch = supabase
+        .channel('crm-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+          get().fetchCustomers()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_opportunities' }, () => {
+          get().fetchSalesOpportunities()
+        })
+        .subscribe()
+      return { __crmChannel: ch } as any
+    })
+  },
+
+  // Cleanup all data realtime subscriptions
+  unsubscribeData: () => {
+    const state = get() as any
+    const channels = ['__projectsChannel', '__tasksChannel', '__documentsChannel', '__crmChannel']
+    channels.forEach(key => {
+      const ch = state[key]
+      if (ch) supabase.removeChannel(ch)
+    })
+    set({ __projectsChannel: null, __tasksChannel: null, __documentsChannel: null, __crmChannel: null } as any)
   },
 
 }))

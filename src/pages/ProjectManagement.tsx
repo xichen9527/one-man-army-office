@@ -21,8 +21,9 @@ import {
   ChevronUp, ChevronDown, Users, X, AlertTriangle,
   FolderOpen, FileText, Upload, Eye, FolderKanban, File, Download,
   History, FolderTree, Grid, List, HardDrive, RotateCcw,
-  Save, Edit3, ChevronRight,
+  Save, Edit3, ChevronRight, Share2,
 } from 'lucide-react'
+import ShareModal from '@/components/ui/share-modal'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import type { ProjectStatus, TaskStatus, TaskPriority } from '@/store'
@@ -161,6 +162,9 @@ export default function ProjectManagement() {
   const [editingProject, setEditingProject] = useState<Record<string, unknown> | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [editingProjectName, setEditingProjectName] = useState<{ id: string; name: string } | null>(null)
+
+  // Share modal state
+  const [shareModal, setShareModal] = useState<{ open: boolean; itemType: 'project' | 'document' | 'file'; itemId: string; itemName: string; isPublic: boolean } | null>(null)
 
   // ============================================================
   // Section 2: 任务看板 Tab State (from Projects.tsx kanban/list/card)
@@ -683,11 +687,15 @@ export default function ProjectManagement() {
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                            onClick={() => { setEditingProject(proj as unknown as Record<string, unknown>); setShowNewProject(true) }}>
+                            onClick={(e) => { e.stopPropagation(); setShareModal({ open: true, itemType: 'project', itemId: proj.id, itemName: proj.name, isPublic: proj.is_public }) }}>
+                            <Share2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                            onClick={(e) => { e.stopPropagation(); setEditingProject(proj as unknown as Record<string, unknown>); setShowNewProject(true) }}>
                             <Edit className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                            onClick={() => setDeleteConfirmId(proj.id)}>
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(proj.id) }}>
                             <Trash2 className="w-3.5 h-3.5 text-red-500" />
                           </Button>
                         </div>
@@ -798,6 +806,9 @@ export default function ProjectManagement() {
                             ) : '-'}
                           </td>
                           <td className="p-3 text-right">
+                            <Button variant="ghost" size="sm" onClick={() => setShareModal({ open: true, itemType: 'project', itemId: proj.id, itemName: proj.name, isPublic: proj.is_public })}>
+                              <Share2 className="w-4 h-4" />
+                            </Button>
                             <Button variant="ghost" size="sm" onClick={() => { setEditingProject(proj as unknown as Record<string, unknown>); setShowNewProject(true) }}>
                               <Edit className="w-4 h-4" />
                             </Button>
@@ -1189,12 +1200,20 @@ export default function ProjectManagement() {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{doc.content?.slice(0, 80) || '暂无内容'}</p>
                               </div>
-                              <button
-                                onClick={e => { e.stopPropagation(); deleteDocument(doc.id) }}
-                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 shrink-0"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                                <button
+                                  onClick={e => { e.stopPropagation(); setShareModal({ open: true, itemType: 'document', itemId: doc.id, itemName: doc.title, isPublic: doc.is_public || false }) }}
+                                  className="p-1 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); deleteDocument(doc.id) }}
+                                  className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 mt-3">
                               <Badge variant="outline" className="text-[10px]">{doc.type}</Badge>
@@ -1435,6 +1454,32 @@ export default function ProjectManagement() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Share Modal */}
+          {shareModal && (
+            <ShareModal
+              open={shareModal.open}
+              onClose={() => setShareModal(null)}
+              itemType={shareModal.itemType}
+              itemId={shareModal.itemId}
+              itemName={shareModal.itemName}
+              isPublic={shareModal.isPublic}
+              onVisibilityChange={async (isPublic) => {
+                if (shareModal.itemType === 'project') {
+                  try {
+                    await updateProject(shareModal.itemId, { is_public: isPublic })
+                    setActionSuccess(isPublic ? 'Project is now public' : 'Project is now private')
+                  } catch (e) { console.error('share visibility update failed:', e); setActionError('Failed to update sharing settings') }
+                } else if (shareModal.itemType === 'document') {
+                  try {
+                    await updateDocument(shareModal.itemId, { is_public: isPublic })
+                    setActionSuccess(isPublic ? 'Document is now public' : 'Document is now private')
+                  } catch (e) { console.error(e); setActionError('Failed to update sharing settings') }
+                }
+                setShareModal(s => s ? { ...s, isPublic } : null)
+              }}
+            />
+          )}
         </TabsContent>
 
       </Tabs>
