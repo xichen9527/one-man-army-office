@@ -198,6 +198,35 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   signIn: async (email, password, remember = false) => {
+    // Use secure-login Edge Function for login security (5 failures → 30min lock)
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/secure-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ identifier: email, password }),
+      })
+      const data = await res.json()
+      if (data.locked) {
+        return { error: { message: data.error } }
+      }
+      if (data.error) {
+        return { error: { message: data.error } }
+      }
+      if (data.success && data.session) {
+        // Set the session from secure-login response
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        })
+        if (!sessionError) await get().loadUser()
+        return { error: sessionError }
+      }
+    } catch {
+      // Fallback: if Edge Function not deployed, use direct auth
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (!error) await get().loadUser()
     return { error }

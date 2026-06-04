@@ -11,7 +11,7 @@ import { useStore } from '@/store'
 export default function Login() {
   const navigate = useNavigate()
   const { signIn } = useStore()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -21,16 +21,17 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!email || !password) {
-      setError('请输入邮箱和密码')
+    if (!identifier || !password) {
+      setError('请输入账号和密码')
       return
     }
     setLoading(true)
-    const { error: err } = await signIn(email, password, rememberMe)
+    const { error: err } = await signIn(identifier, password, rememberMe)
     setLoading(false)
     if (err) {
       const msg = err.message || ''
-      if (msg.includes('Invalid login credentials')) setError('邮箱或密码错误')
+      if (msg.includes('锁定')) setError(msg)
+      else if (msg.includes('Invalid login credentials') || msg.includes('用户名或密码错误')) setError('用户名或密码错误')
       else if (msg.includes('Email not confirmed')) setError('请先验证邮箱')
       else if (msg.includes('Too many requests')) setError('登录尝试次数过多，请稍后再试')
       else setError(msg || '登录失败，请重试')
@@ -68,8 +69,8 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">邮箱地址</Label>
-                <Input id="email" type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+                <Label htmlFor="identifier">账号</Label>
+                <Input id="identifier" type="text" placeholder="用户名或邮箱" value={identifier} onChange={e => setIdentifier(e.target.value)} required autoComplete="username" />
               </div>
 
               <div className="space-y-2">
