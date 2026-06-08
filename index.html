@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>one-man-army-office</title>
+    <script>
+      // GitHub Pages SPA routing fix
+      // 404.html 会将路径编码到 ?p= 参数，这里解析并恢复
+      (function() {
+        var search = window.location.search;
+        if (search.indexOf('?p=') === 0) {
+          var path = decodeURIComponent(search.substring(3));
+          window.history.replaceState(null, null, path);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

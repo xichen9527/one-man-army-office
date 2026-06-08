@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>一人成军办公平台</title>
+    <script>
+      // GitHub Pages 404 handler for SPA with base path
+      var l = window.location;
+      // base path: /one-man-army-office/
+      // 从 URL 提取 base 之后的路径部分
+      var basePath = '/one-man-army-office/';
+      var fullPath = l.pathname + l.search + l.hash;
+      // 去掉 base path 前缀
+      var subPath = fullPath;
+      if (fullPath.indexOf(basePath) === 0) {
+        subPath = fullPath.substring(basePath.length);
+      }
+      // 重定向到 index.html 并带上路径参数
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        basePath + '?p=' + encodeURIComponent(subPath)
+      );
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>
