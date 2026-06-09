@@ -12,7 +12,8 @@ import {
   Bell, 
   Shield, 
   Palette, 
-  Globe,
+  Globe as GlobeIcon,
+  Video,
   Upload,
   AlertCircle,
   Check,
@@ -1367,6 +1368,60 @@ const THIRD_PARTY_SERVICES: ThirdPartyCredential[] = [
       { key: 'secret_key', label: 'Secret Key', type: 'password', placeholder: '腾讯会议开放平台 Secret Key' },
     ],
   },
+  {
+    id: 'social-weibo',
+    service: 'social-weibo',
+    label: '微博',
+    fields: [
+      { key: 'app_key', label: 'App Key', placeholder: '微博开放平台 App Key' },
+      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: '微博开放平台 App Secret' },
+    ],
+  },
+  {
+    id: 'social-wechat',
+    service: 'social-wechat',
+    label: '微信公众号',
+    fields: [
+      { key: 'app_id', label: 'AppID', placeholder: '微信公众平台 AppID' },
+      { key: 'app_secret', label: 'AppSecret', type: 'password', placeholder: '微信公众平台 AppSecret' },
+    ],
+  },
+  {
+    id: 'social-douyin',
+    service: 'social-douyin',
+    label: '抖音',
+    fields: [
+      { key: 'client_key', label: 'Client Key', placeholder: '抖音开放平台 Client Key' },
+      { key: 'client_secret', label: 'Client Secret', type: 'password', placeholder: '抖音开放平台 Client Secret' },
+    ],
+  },
+  {
+    id: 'social-xiaohongshu',
+    service: 'social-xiaohongshu',
+    label: '小红书',
+    fields: [
+      { key: 'app_key', label: 'App Key', placeholder: '小红书开放平台 App Key' },
+      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: '小红书开放平台 App Secret' },
+    ],
+  },
+  {
+    id: 'social-bilibili',
+    service: 'social-bilibili',
+    label: 'B站',
+    fields: [
+      { key: 'app_key', label: 'App Key', placeholder: 'B站开放平台 App Key' },
+      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: 'B站开放平台 App Secret' },
+    ],
+  },
+  {
+    id: 'social-zhihu',
+    service: 'social-zhihu',
+    label: '知乎',
+    fields: [
+      { key: 'client_id', label: 'Client ID', placeholder: '知乎开放平台 Client ID' },
+      { key: 'client_secret', label: 'Client Secret', type: 'password', placeholder: '知乎开放平台 Client Secret' },
+    ],
+  },
 ]
 
 const TP_STORAGE_KEY = 'third_party_credentials'
@@ -1416,7 +1471,6 @@ function ThirdPartyServices() {
           setTestResult({ id: svc.id, ok: false, msg: '请先填写 App ID 和 Secret Key' })
           return
         }
-        const { createClient } = await import('@supabase/supabase-js')
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
         const resp = await fetch(`${supabaseUrl}/functions/v1/tencent-meeting-api`, {
           method: 'POST',
@@ -1426,6 +1480,26 @@ function ThirdPartyServices() {
         })
         if (resp.ok) {
           setTestResult({ id: svc.id, ok: true, msg: '连接成功 ✅' })
+        } else {
+          const err = await resp.json().catch(() => ({}))
+          setTestResult({ id: svc.id, ok: false, msg: `失败: ${err.error || err.detail || resp.statusText}` })
+        }
+      } else if (svc.id.startsWith('social-')) {
+        const platform = svc.id.replace('social-', '')
+        const hasAll = svc.fields.every(f => form[f.key]?.trim())
+        if (!hasAll) {
+          setTestResult({ id: svc.id, ok: false, msg: '请先填写所有必填字段' })
+          return
+        }
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+        const resp = await fetch(`${supabaseUrl}/functions/v1/social-oauth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'test', platform, credentials: form }),
+          signal: AbortSignal.timeout(10000),
+        })
+        if (resp.ok) {
+          setTestResult({ id: svc.id, ok: true, msg: `${svc.label}凭证验证通过 ✅` })
         } else {
           const err = await resp.json().catch(() => ({}))
           setTestResult({ id: svc.id, ok: false, msg: `失败: ${err.error || err.detail || resp.statusText}` })
@@ -1457,7 +1531,7 @@ function ThirdPartyServices() {
           <div key={svc.id} className="p-4 rounded-lg border">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Video className="w-5 h-5 text-blue-500" />
+                {svc.id.startsWith('social-') ? <GlobeIcon className="w-5 h-5 text-pink-500" /> : <Video className="w-5 h-5 text-blue-500" />}
                 <span className="text-sm font-medium">{svc.label}</span>
                 {configured ? (
                   <span className="text-[10px] px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">已配置</span>
