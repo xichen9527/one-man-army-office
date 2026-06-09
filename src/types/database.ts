@@ -90,7 +90,7 @@ export interface Document {
   id: string
   title: string
   content: string | null
-  type: 'markdown' | 'richtext' | 'code'
+  type: 'markdown' | 'richtext' | 'code' | 'word' | 'excel' | 'ppt' | 'mindmap' | 'flowchart' | 'other'
   project_id: string | null
   task_id: string | null
   creator_id: string

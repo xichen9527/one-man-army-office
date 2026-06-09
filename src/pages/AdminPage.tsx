@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Users, Activity, Database, Shield, Settings, FileText,
   TrendingUp, AlertTriangle, CheckCircle, Clock, Eye, Ban,
-  RefreshCw, ChevronRight, Globe, Cpu, HardDrive
+  RefreshCw, ChevronRight, Globe, Cpu, HardDrive, UserCog, Key
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { format, parseISO } from 'date-fns'
@@ -80,6 +80,8 @@ export default function AdminPage() {
     { key: 'overview', label: '系统概览', icon: <Activity className="w-4 h-4" /> },
     { key: 'tables', label: '数据表', icon: <Database className="w-4 h-4" /> },
     { key: 'logs', label: '审计日志', icon: <FileText className="w-4 h-4" /> },
+    { key: 'users', label: '用户管理', icon: <UserCog className="w-4 h-4" /> },
+    { key: 'permissions', label: '权限管理', icon: <Key className="w-4 h-4" /> },
     { key: 'config', label: '系统配置', icon: <Settings className="w-4 h-4" /> },
   ]
 
@@ -322,6 +324,122 @@ export default function AdminPage() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* User Management */}
+          {activeSection === 'users' && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <UserCog className="w-4 h-4" />
+                    用户管理
+                    <Badge variant="secondary" className="text-[10px] ml-2">{users.length} 用户</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {users.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">暂无用户数据</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[500px]">
+                      <div className="space-y-1">
+                        {users.map((u: any) => (
+                          <div key={u.id} className="flex items-center gap-4 p-3 rounded-lg border hover:bg-gray-50">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-medium">
+                              {(u.username || u.full_name || '?')[0].toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{u.full_name || u.username || '未命名用户'}</span>
+                                <Badge variant="secondary" className="text-[10px]">{u.role || 'member'}</Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span>{u.email || '-'}</span>
+                                {u.username && <span>@{u.username}</span>}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-xs text-gray-400">
+                                {u.created_at ? format(parseISO(u.created_at), 'yyyy-MM-dd') : '-'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Permission Management */}
+          {activeSection === 'permissions' && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Key className="w-4 h-4" />
+                    权限管理
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h4 className="text-sm font-medium mb-3">角色权限矩阵</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-gray-500 border-b">
+                              <th className="text-left py-2 pr-4">权限</th>
+                              <th className="text-center py-2 px-3">管理员</th>
+                              <th className="text-center py-2 px-3">经理</th>
+                              <th className="text-center py-2 px-3">成员</th>
+                              <th className="text-center py-2 px-3">访客</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {[
+                              ['仪表盘', true, true, true, true],
+                              ['项目管理', true, true, true, false],
+                              ['创建项目', true, true, true, false],
+                              ['删除项目', true, true, false, false],
+                              ['团队协作', true, true, true, false],
+                              ['频道管理', true, true, false, false],
+                              ['CRM 客户', true, true, true, false],
+                              ['删除客户', true, true, false, false],
+                              ['AI 助手', true, true, true, false],
+                              ['自媒体管理', true, true, true, false],
+                              ['视频会议', true, true, true, false],
+                              ['管理后台', true, false, false, false],
+                              ['用户管理', true, false, false, false],
+                              ['系统配置', true, false, false, false],
+                            ].map(([perm, admin, manager, member, viewer]: [string, boolean, boolean, boolean, boolean]) => (
+                              <tr key={perm} className="border-b last:border-0 hover:bg-gray-50">
+                                <td className="py-2 pr-4 text-gray-700">{perm}</td>
+                                <td className="text-center py-2 px-3">{admin ? '✅' : '❌'}</td>
+                                <td className="text-center py-2 px-3">{manager ? '✅' : '❌'}</td>
+                                <td className="text-center py-2 px-3">{member ? '✅' : '❌'}</td>
+                                <td className="text-center py-2 px-3">{viewer ? '✅' : '❌'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <div className="flex items-center gap-2 text-sm text-blue-700">
+                        <Shield className="w-4 h-4" />
+                        <span>RLS（行级安全）策略已启用，数据访问由 Supabase RLS 控制。</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* System Config */}

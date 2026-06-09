@@ -198,6 +198,7 @@ export default function ProjectManagement() {
   const [editingDoc, setEditingDoc] = useState<string | null>(null)
   const [showNewDoc, setShowNewDoc] = useState(false)
   const [newDocTitle, setNewDocTitle] = useState('')
+  const [newDocType, setNewDocType] = useState('markdown')
   const [newDocContent, setNewDocContent] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('blank')
   const [docPreview, setDocPreview] = useState(true)
@@ -1245,6 +1246,32 @@ export default function ProjectManagement() {
                     <Input value={newDocTitle} onChange={e => setNewDocTitle(e.target.value)} placeholder="输入文档标题" autoFocus />
                   </div>
                   <div>
+                    <Label>文档类型</Label>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {[
+                        { value: 'markdown', label: 'Markdown', icon: '📝' },
+                        { value: 'richtext', label: '富文本', icon: '📄' },
+                        { value: 'code', label: '代码', icon: '💻' },
+                        { value: 'word', label: 'Word', icon: '📊' },
+                        { value: 'excel', label: 'Excel', icon: '📈' },
+                        { value: 'ppt', label: 'PPT', icon: '🎯' },
+                        { value: 'mindmap', label: '思维导图', icon: '🧠' },
+                        { value: 'flowchart', label: '流程图', icon: '🔀' },
+                        { value: 'other', label: '其他', icon: '📎' },
+                      ].map(t => (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setNewDocType(t.value)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${(newDocType as string) === t.value ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+                        >
+                          <span>{t.icon}</span>
+                          <span>{t.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
                     <Label>模板</Label>
                     <div className="flex gap-2 mt-1">
                       {['blank', 'meeting', 'report', 'proposal'].map(t => (
@@ -1270,7 +1297,7 @@ export default function ProjectManagement() {
                       clearFeedback()
                       try {
                         const template = selectedTemplate === 'blank' ? newDocContent : (selectedTemplate === 'meeting' ? '# 会议主题\n\n## 参会人员\n\n## 议程\n\n## 决议\n\n' + newDocContent : selectedTemplate === 'report' ? '# 报告标题\n\n## 摘要\n\n## 详情\n\n' + newDocContent : selectedTemplate === 'proposal' ? '# 方案标题\n\n## 背景\n\n## 方案\n\n## 预期效果\n\n' + newDocContent : newDocContent)
-                        await addDocument({ title: newDocTitle.trim(), content: template })
+                        await addDocument({ title: newDocTitle.trim(), content: template, type: newDocType as any })
                         setShowNewDoc(false)
                         setNewDocTitle('')
                         setNewDocContent('')

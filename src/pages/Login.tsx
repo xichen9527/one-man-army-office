@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Bot, Eye, EyeOff, AlertCircle, Loader2, Shield } from 'lucide-react'
+import { Bot, Eye, EyeOff, AlertCircle, Loader2, Shield, Mail, CheckCircle } from 'lucide-react'
 import { useStore } from '@/store'
+import { supabase } from '@/db/supabase'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -18,6 +19,13 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   
+  // Forgot password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetSuccess, setResetSuccess] = useState(false)
+  const [resetError, setResetError] = useState('')
+
   // 2FA state
   const [show2FA, setShow2FA] = useState(false)
   const [userId2FA, setUserId2FA] = useState<string | null>(null)
@@ -181,9 +189,82 @@ export default function Login() {
     )
   }
 
+  // Forgot Password Dialog
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetEmail.trim()) {
+      setResetError('请输入邮箱地址')
+      return
+    }
+    setResetLoading(true)
+    setResetError('')
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+        redirectTo: `${window.location.origin}/login`
+      })
+      if (err) {
+        setResetError(err.message || '发送失败，请重试')
+      } else {
+        setResetSuccess(true)
+      }
+    } catch {
+      setResetError('网络错误，请重试')
+    }
+    setResetLoading(false)
+  }
+
   // Regular Login UI
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md border-0 shadow-xl">
+            <CardHeader className="space-y-1 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100">
+                  <Mail className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">重置密码</CardTitle>
+                  <CardDescription>输入您的邮箱，我们将发送重置链接</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {resetSuccess ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle className="h-5 w-5 shrink-0" />
+                    <span>重置链接已发送到 <strong>{resetEmail}</strong>，请查收邮件并按链接重置密码。</span>
+                  </div>
+                  <Button onClick={() => { setShowForgotPassword(false); setResetSuccess(false); setResetEmail('') }} className="w-full">返回登录</Button>
+                </div>
+              ) : (
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  {resetError && (
+                    <div className="flex items-center gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      {resetError}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">邮箱地址</Label>
+                    <Input id="reset-email" type="email" placeholder="请输入注册邮箱" value={resetEmail} onChange={e => setResetEmail(e.target.value)} required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={resetLoading}>
+                    {resetLoading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />发送中...</span> : '发送重置链接'}
+                  </Button>
+                  <button type="button" onClick={() => { setShowForgotPassword(false); setResetError(''); setResetEmail('') }} className="w-full text-sm text-gray-500 hover:text-gray-700">
+                    返回登录
+                  </button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center space-y-2">
@@ -230,7 +311,7 @@ export default function Login() {
                   <Checkbox id="remember" checked={rememberMe} onCheckedChange={checked => setRememberMe(checked as boolean)} />
                   <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">记住我</Label>
                 </div>
-                <button type="button" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <button type="button" onClick={() => { setShowForgotPassword(true); setError('') }} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                   忘记密码？
                 </button>
               </div>
