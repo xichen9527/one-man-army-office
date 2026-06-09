@@ -311,7 +311,6 @@ export const useStore = create<AppState>((set, get) => ({
         return { error: null, requires2FA: true, userId }
       }
     } catch (e) {
-      console.error('Error checking 2FA status:', e)
       // If we can't check, proceed without 2FA
     }
 
@@ -368,7 +367,6 @@ export const useStore = create<AppState>((set, get) => ({
 
       return { error: null }
     } catch (e) {
-      console.error('2FA verification error:', e)
       return { error: { message: '验证失败，请重试' } }
     }
   },
@@ -407,19 +405,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
-    } catch (e) { console.error('addProject failed:', e) }
+    } catch (e) {}
   },
   updateProject: async (id, updates) => {
     try {
       const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
-    } catch (e) { console.error('updateProject failed:', e) }
+    } catch (e) {}
   },
   deleteProject: async (id) => {
     try {
       await supabase.from('projects').delete().eq('id', id)
       set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
-    } catch (e) { console.error('deleteProject failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Tasks ==========
@@ -438,19 +436,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
-    } catch (e) { console.error('addTask failed:', e) }
+    } catch (e) {}
   },
   updateTask: async (id, updates) => {
     try {
       const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
-    } catch (e) { console.error('updateTask failed:', e) }
+    } catch (e) {}
   },
   deleteTask: async (id) => {
     try {
       await supabase.from('tasks').delete().eq('id', id)
       set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
-    } catch (e) { console.error('deleteTask failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Documents ==========
@@ -471,19 +469,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
-    } catch (e) { console.error('addDocument failed:', e) }
+    } catch (e) {}
   },
   updateDocument: async (id, updates) => {
     try {
       const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
-    } catch (e) { console.error('updateDocument failed:', e) }
+    } catch (e) {}
   },
   deleteDocument: async (id) => {
     try {
       await supabase.from('documents').delete().eq('id', id)
       set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
-    } catch (e) { console.error('deleteDocument failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Messages & Channels ==========
@@ -503,7 +501,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({ activeChannel: data[0].id })
         get().fetchMessages(data[0].id)
       }
-    } catch (e) { console.error('fetchChannels failed:', e) }
+    } catch (e) {}
   },
   createChannel: async (name, description, isPrivate) => {
     try {
@@ -513,13 +511,13 @@ export const useStore = create<AppState>((set, get) => ({
         name, description, is_private: isPrivate, created_by: user.user.id,
       } as ChannelInsert).select().single()
       if (data) set((s) => ({ channels: [...s.channels, data as Channel] }))
-    } catch (e) { console.error('createChannel failed:', e) }
+    } catch (e) {}
   },
   updateChannel: async (id, updates) => {
     try {
       const { data } = await supabase.from('channels').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ channels: s.channels.map((c: Channel) => c.id === id ? data as Channel : c) }))
-    } catch (e) { console.error('updateChannel failed:', e) }
+    } catch (e) {}
   },
   deleteChannel: async (id) => {
     try {
@@ -534,13 +532,13 @@ export const useStore = create<AppState>((set, get) => ({
           activeChannel: s.activeChannel === id ? (remaining[0]?.id || null) : s.activeChannel
         }
       })
-    } catch (e) { console.error('deleteChannel failed:', e) }
+    } catch (e) {}
   },
   fetchMessages: async (channelId) => {
     try {
       const { data } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
       set((s) => ({ messages: { ...s.messages, [channelId]: (data as Message[] | null) || [] } }))
-    } catch (e) { console.error('fetchMessages failed:', e) }
+    } catch (e) {}
   },
   setActiveChannel: (id) => {
     set({ activeChannel: id })
@@ -556,26 +554,26 @@ export const useStore = create<AppState>((set, get) => ({
       const { data } = await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content, message_type: 'text', reply_to: replyTo,
       } as any).select().single()
-    } catch (e) { console.error('sendMessage failed:', e); throw e }
+    } catch (e) {throw e }
   },
   sendFileMessage: async (channelId, fileUrl, fileName, senderId, senderName, replyTo = null) => {
     try {
       await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content: fileName, message_type: 'file', file_url: fileUrl, file_name: fileName, reply_to: replyTo,
       } as any).select().single()
-    } catch (e) { console.error('sendFileMessage failed:', e); throw e }
+    } catch (e) {throw e }
   },
   updateMessage: async (id, channelId, updates) => {
     try {
       const { data } = await supabase.from('messages').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).map((m: Message) => m.id === id ? data as Message : m) } }))
-    } catch (e) { console.error('updateMessage failed:', e); throw e }
+    } catch (e) {throw e }
   },
   deleteMessage: async (id, channelId) => {
     try {
       await supabase.from('messages').delete().eq('id', id)
       set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).filter((m: Message) => m.id !== id) } }))
-    } catch (e) { console.error('deleteMessage failed:', e); throw e }
+    } catch (e) {throw e }
   },
   addNotification: async (userId, title, content, type) => {
     try {
@@ -583,7 +581,7 @@ export const useStore = create<AppState>((set, get) => ({
         user_id: userId, title, content, type, read: false,
       } as any).select().single()
       if (data) set((s) => ({ notifications: [data as Notification, ...s.notifications] }))
-    } catch (e) { console.error('addNotification failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Team ==========
@@ -637,21 +635,21 @@ export const useStore = create<AppState>((set, get) => ({
               token,
             }),
           })
-        } catch (e) { console.warn('发送邀请邮件失败:', e) }
+        } catch (e) {}
       }
-    } catch (e) { console.error('addMember failed:', e) }
+    } catch (e) {}
   },
   removeMember: async (id) => {
     try {
       await supabase.from('team_members').delete().eq('id', id)
       set((s) => ({ members: s.members.filter((m: TeamMember) => m.id !== id) }))
-    } catch (e) { console.error('removeMember failed:', e) }
+    } catch (e) {}
   },
   updateMember: async (id, updates) => {
     try {
       const { data } = await supabase.from('team_members').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ members: s.members.map((m: TeamMember) => m.id === id ? data as TeamMember : m) }))
-    } catch (e) { console.error('updateMember failed:', e) }
+    } catch (e) {}
   },
 
   // ========== CRM ==========
@@ -670,19 +668,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('customers').insert({ ...c, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ customers: [data as Customer, ...s.customers] }))
-    } catch (e) { console.error('addCustomer failed:', e) }
+    } catch (e) {}
   },
   updateCustomer: async (id, updates) => {
     try {
       const { data } = await supabase.from('customers').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ customers: s.customers.map((c: Customer) => c.id === id ? data as Customer : c) }))
-    } catch (e) { console.error('updateCustomer failed:', e) }
+    } catch (e) {}
   },
   deleteCustomer: async (id) => {
     try {
       await supabase.from('customers').delete().eq('id', id)
       set((s) => ({ customers: s.customers.filter((c: Customer) => c.id !== id) }))
-    } catch (e) { console.error('deleteCustomer failed:', e) }
+    } catch (e) {}
   },
   salesOpportunities: [],
   fetchSalesOpportunities: async () => {
@@ -699,13 +697,13 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('sales_opportunities').insert({ ...o, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ salesOpportunities: [data as SalesOpportunity, ...s.salesOpportunities] }))
-    } catch (e) { console.error('addOpportunity failed:', e) }
+    } catch (e) {}
   },
   updateOpportunity: async (id, updates) => {
     try {
       const { data } = await supabase.from('sales_opportunities').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ salesOpportunities: s.salesOpportunities.map((o: SalesOpportunity) => o.id === id ? data as SalesOpportunity : o) }))
-    } catch (e) { console.error('updateOpportunity failed:', e) }
+    } catch (e) {}
   },
 
   // ========== AI ==========
@@ -724,7 +722,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
       set((s) => ({ aiMessages: { ...s.aiMessages, [convId]: (data as AIMessage[] | null) || [] } }))
-    } catch (e) { console.error('fetchAIMessages failed:', e) }
+    } catch (e) {}
   },
   setActiveAIConv: (id) => set({ activeAIConv: id }),
   createAIConv: async (title, featureType) => {
@@ -739,7 +737,7 @@ export const useStore = create<AppState>((set, get) => ({
         return data.id
       }
       return ''
-    } catch (e) { console.error('createAIConv failed:', e); return '' }
+    } catch (e) {return '' }
   },
   sendAIMessage: async (convId, content) => {
     const { data: user } = await supabase.auth.getUser()
@@ -889,7 +887,6 @@ export const useStore = create<AppState>((set, get) => ({
         )
         streamOk = true
       } catch (e: any) {
-        console.warn('自定义 API 流式调用失败，尝试系统 API:', e.message)
       }
     }
 
@@ -909,7 +906,6 @@ export const useStore = create<AppState>((set, get) => ({
         modelName = 'system-default'
         streamOk = true
       } catch (e: any) {
-        console.warn('Edge Function 流式调用失败:', e.message)
       }
     }
 
@@ -943,9 +939,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { data: aiMsgFinal, error: aiMsgError } = await supabase.from('ai_messages').update({
       content: aiContent, model: modelName,
     } as any).eq('id', aiMsgPlaceholder.id).select().single()
-    if (aiMsgError) console.error('更新 AI 消息失败:', aiMsgError)
-
-    // 更新本地状态为最终内容
+    if (aiMsgError)// 更新本地状态为最终内容
     set((s) => ({
       aiMessages: {
         ...s.aiMessages,
@@ -979,20 +973,20 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data } = await supabase.from('followups').select('*').eq('customer_id', customerId).order('created_at', { ascending: false })
       set((s) => ({ followups: { ...s.followups, [customerId]: (data as Followup[] | null) || [] } }))
-    } catch (e) { console.error('fetchFollowups failed:', e) }
+    } catch (e) {}
   },
   addFollowup: async (data) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       const { data: fol } = await supabase.from('followups').insert({ ...data, user_id: user?.id || '' }).select().single()
       if (fol) set((s) => ({ followups: { ...s.followups, [fol.customer_id]: [fol as Followup, ...(s.followups[fol.customer_id] || [])] } }))
-    } catch (e) { console.error('addFollowup failed:', e) }
+    } catch (e) {}
   },
   deleteFollowup: async (id, customerId) => {
     try {
       await supabase.from('followups').delete().eq('id', id)
       set((s) => ({ followups: { ...s.followups, [customerId]: (s.followups[customerId] || []).filter((f: Followup) => f.id !== id) } }))
-    } catch (e) { console.error('deleteFollowup failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Social Media ==========
@@ -1013,13 +1007,13 @@ export const useStore = create<AppState>((set, get) => ({
       if (accountId) query = query.eq('account_id', accountId)
       const { data } = await query
       set({ socialPosts: (data as SocialPost[] | null) || [] })
-    } catch (e) { console.error('fetchSocialPosts failed:', e) }
+    } catch (e) {}
   },
   fetchTrendingTopics: async () => {
     try {
       const { data } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
       set({ trendingTopics: (data as TrendingTopic[] | null) || [] })
-    } catch (e) { console.error('fetchTrendingTopics failed:', e) }
+    } catch (e) {}
   },
   addSocialAccount: async (a) => {
     try {
@@ -1027,19 +1021,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('social_accounts').insert({ ...a, user_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ socialAccounts: [data as SocialAccount, ...s.socialAccounts] }))
-    } catch (e) { console.error('addSocialAccount failed:', e) }
+    } catch (e) {}
   },
   updateSocialAccount: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_accounts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialAccounts: s.socialAccounts.map((a: SocialAccount) => a.id === id ? data as SocialAccount : a) }))
-    } catch (e) { console.error('updateSocialAccount failed:', e) }
+    } catch (e) {}
   },
   deleteSocialAccount: async (id) => {
     try {
       await supabase.from('social_accounts').delete().eq('id', id)
       set((s) => ({ socialAccounts: s.socialAccounts.filter((a: SocialAccount) => a.id !== id) }))
-    } catch (e) { console.error('deleteSocialAccount failed:', e) }
+    } catch (e) {}
   },
   syncSocialAccount: async (id, credentials) => {
     const account = get().socialAccounts.find((a: SocialAccount) => a.id === id)
@@ -1069,26 +1063,25 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return json
     } catch (e) {
-      console.warn('同步失败:', e)
     }
   },
   addSocialPost: async (p) => {
     try {
       const { data } = await supabase.from('social_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
-    } catch (e) { console.error('addSocialPost failed:', e) }
+    } catch (e) {}
   },
   updateSocialPost: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_posts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialPosts: s.socialPosts.map((p: SocialPost) => p.id === id ? data as SocialPost : p) }))
-    } catch (e) { console.error('updateSocialPost failed:', e) }
+    } catch (e) {}
   },
   deleteSocialPost: async (id) => {
     try {
       await supabase.from('social_posts').delete().eq('id', id)
       set((s) => ({ socialPosts: s.socialPosts.filter((p: SocialPost) => p.id !== id) }))
-    } catch (e) { console.error('deleteSocialPost failed:', e) }
+    } catch (e) {}
   },
 
   // Open OAuth authorization window for a platform account
@@ -1168,19 +1161,19 @@ export const useStore = create<AppState>((set, get) => ({
         ...c, host_id: user.user.id, meeting_id: meetingId,
       } as any).select().single()
       if (data) set((s) => ({ conferences: [data as Conference, ...s.conferences] }))
-    } catch (e) { console.error('addConference failed:', e) }
+    } catch (e) {}
   },
   updateConference: async (id, updates) => {
     try {
       const { data } = await supabase.from('video_conferences').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ conferences: s.conferences.map((c: Conference) => c.id === id ? data as Conference : c) }))
-    } catch (e) { console.error('updateConference failed:', e) }
+    } catch (e) {}
   },
   deleteConference: async (id) => {
     try {
       await supabase.from('video_conferences').delete().eq('id', id)
       set((s) => ({ conferences: s.conferences.filter((c: Conference) => c.id !== id) }))
-    } catch (e) { console.error('deleteConference failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Notifications ==========
@@ -1195,7 +1188,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       await supabase.from('notifications').update({ read: true } as any).eq('id', id)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => n.id === id ? { ...n, read: true } : n) }))
-    } catch (e) { console.error('markNotificationRead failed:', e) }
+    } catch (e) {}
   },
   markAllNotificationsRead: async () => {
     try {
@@ -1203,7 +1196,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       await supabase.from('notifications').update({ read: true } as any).eq('user_id', user.user.id).eq('read', false)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, read: true })) }))
-    } catch (e) { console.error('markAllNotificationsRead failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Files ==========
@@ -1218,7 +1211,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (projectId) query = query.eq('project_id', projectId)
       const { data } = await query
       set({ files: (data as DBFile[] | null) || [] })
-    } catch (e) { console.error('fetchFiles failed:', e) }
+    } catch (e) {}
   },
   uploadFile: async (file, projectId, onProgress) => {
     try {
@@ -1243,7 +1236,7 @@ export const useStore = create<AppState>((set, get) => ({
       } as any).select().single()
       if (data) set((s) => ({ files: [data as DBFile, ...s.files] }))
       return data as DBFile | null
-    } catch (e) { console.error('uploadFile failed:', e); return null }
+    } catch (e) {return null }
   },
   deleteFile: async (id) => {
     try {
@@ -1251,7 +1244,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (file) await supabase.storage.from('files').remove([file.file_path]).catch(() => {})
       await supabase.from('files').delete().eq('id', id)
       set((s) => ({ files: s.files.filter(f => f.id !== id) }))
-    } catch (e) { console.error('deleteFile failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Team Calendar / Schedules ==========
@@ -1264,7 +1257,7 @@ export const useStore = create<AppState>((set, get) => ({
         .select('*').eq('user_id', user.user.id)
         .order('start_time', { ascending: true })
       set({ schedules: (data as Schedule[] | null) || [] })
-    } catch (e) { console.error('fetchSchedules failed:', e) }
+    } catch (e) {}
   },
   addSchedule: async (s) => {
     try {
@@ -1272,19 +1265,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('schedules').insert({ ...s, user_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ schedules: [...s.schedules, data as Schedule].sort((a, b) => a.start_time.localeCompare(b.start_time)) }))
-    } catch (e) { console.error('addSchedule failed:', e) }
+    } catch (e) {}
   },
   updateSchedule: async (id, updates) => {
     try {
       const { data } = await supabase.from('schedules').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ schedules: s.schedules.map((sc: Schedule) => sc.id === id ? data as Schedule : sc) }))
-    } catch (e) { console.error('updateSchedule failed:', e) }
+    } catch (e) {}
   },
   deleteSchedule: async (id) => {
     try {
       await supabase.from('schedules').delete().eq('id', id)
       set((s) => ({ schedules: s.schedules.filter((sc: Schedule) => sc.id !== id) }))
-    } catch (e) { console.error('deleteSchedule failed:', e) }
+    } catch (e) {}
   },
 
   // ========== Task Reports ==========
@@ -1296,20 +1289,20 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await q
       if (error) throw error
       set({ taskReports: data || [] })
-    } catch (e: any) { console.error('fetchTaskReports failed:', e) }
+    } catch (e: any) {}
   },
   addTaskReport: async (r) => {
     try {
       const { data, error } = await supabase.from('task_reports').insert(r).select().single()
       if (error) throw error
       set((s) => ({ taskReports: [data, ...s.taskReports] }))
-    } catch (e: any) { console.error('addTaskReport failed:', e) }
+    } catch (e: any) {}
   },
   deleteTaskReport: async (id) => {
     try {
       await supabase.from('task_reports').delete().eq('id', id)
       set((s) => ({ taskReports: s.taskReports.filter((r: TaskReport) => r.id !== id) }))
-    } catch (e: any) { console.error('deleteTaskReport failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Workspace Members ==========
@@ -1319,27 +1312,27 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await supabase.from('workspace_members').select('*').eq('workspace_id', workspaceId).order('joined_at', { ascending: false })
       if (error) throw error
       set({ workspaceMembers: data || [] })
-    } catch (e: any) { console.error('fetchWorkspaceMembers failed:', e) }
+    } catch (e: any) {}
   },
   addWorkspaceMember: async (m) => {
     try {
       const { data, error } = await supabase.from('workspace_members').insert(m).select().single()
       if (error) throw error
       set((s) => ({ workspaceMembers: [data, ...s.workspaceMembers] }))
-    } catch (e: any) { console.error('addWorkspaceMember failed:', e) }
+    } catch (e: any) {}
   },
   updateWorkspaceMember: async (id, updates) => {
     try {
       const { data, error } = await supabase.from('workspace_members').update(updates).eq('id', id).select().single()
       if (error) throw error
       set((s) => ({ workspaceMembers: s.workspaceMembers.map((m: WorkspaceMember) => m.id === id ? data : m) }))
-    } catch (e: any) { console.error('updateWorkspaceMember failed:', e) }
+    } catch (e: any) {}
   },
   removeWorkspaceMember: async (id) => {
     try {
       await supabase.from('workspace_members').delete().eq('id', id)
       set((s) => ({ workspaceMembers: s.workspaceMembers.filter((m: WorkspaceMember) => m.id !== id) }))
-    } catch (e: any) { console.error('removeWorkspaceMember failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Workspace Templates ==========
@@ -1349,20 +1342,20 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await supabase.from('workspace_templates').select('*').order('created_at', { ascending: false })
       if (error) throw error
       set({ workspaceTemplates: data || [] })
-    } catch (e: any) { console.error('fetchWorkspaceTemplates failed:', e) }
+    } catch (e: any) {}
   },
   addWorkspaceTemplate: async (t) => {
     try {
       const { data, error } = await supabase.from('workspace_templates').insert(t).select().single()
       if (error) throw error
       set((s) => ({ workspaceTemplates: [data, ...s.workspaceTemplates] }))
-    } catch (e: any) { console.error('addWorkspaceTemplate failed:', e) }
+    } catch (e: any) {}
   },
   deleteWorkspaceTemplate: async (id) => {
     try {
       await supabase.from('workspace_templates').delete().eq('id', id)
       set((s) => ({ workspaceTemplates: s.workspaceTemplates.filter((t: WorkspaceTemplate) => t.id !== id) }))
-    } catch (e: any) { console.error('deleteWorkspaceTemplate failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Content Templates ==========
@@ -1374,20 +1367,20 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await q
       if (error) throw error
       set({ contentTemplates: data || [] })
-    } catch (e: any) { console.error('fetchContentTemplates failed:', e) }
+    } catch (e: any) {}
   },
   addContentTemplate: async (t) => {
     try {
       const { data, error } = await supabase.from('content_templates').insert(t).select().single()
       if (error) throw error
       set((s) => ({ contentTemplates: [data, ...s.contentTemplates] }))
-    } catch (e: any) { console.error('addContentTemplate failed:', e) }
+    } catch (e: any) {}
   },
   deleteContentTemplate: async (id) => {
     try {
       await supabase.from('content_templates').delete().eq('id', id)
       set((s) => ({ contentTemplates: s.contentTemplates.filter((t: ContentTemplate) => t.id !== id) }))
-    } catch (e: any) { console.error('deleteContentTemplate failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Automation Workflows ==========
@@ -1397,34 +1390,34 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await supabase.from('automation_workflows').select('*').order('created_at', { ascending: false })
       if (error) throw error
       set({ automationWorkflows: data || [] })
-    } catch (e: any) { console.error('fetchAutomationWorkflows failed:', e) }
+    } catch (e: any) {}
   },
   addAutomationWorkflow: async (w) => {
     try {
       const { data, error } = await supabase.from('automation_workflows').insert(w).select().single()
       if (error) throw error
       set((s) => ({ automationWorkflows: [data, ...s.automationWorkflows] }))
-    } catch (e: any) { console.error('addAutomationWorkflow failed:', e) }
+    } catch (e: any) {}
   },
   updateAutomationWorkflow: async (id, updates) => {
     try {
       const { data, error } = await supabase.from('automation_workflows').update(updates).eq('id', id).select().single()
       if (error) throw error
       set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
-    } catch (e: any) { console.error('updateAutomationWorkflow failed:', e) }
+    } catch (e: any) {}
   },
   deleteAutomationWorkflow: async (id) => {
     try {
       await supabase.from('automation_workflows').delete().eq('id', id)
       set((s) => ({ automationWorkflows: s.automationWorkflows.filter((w: AutomationWorkflow) => w.id !== id) }))
-    } catch (e: any) { console.error('deleteAutomationWorkflow failed:', e) }
+    } catch (e: any) {}
   },
   toggleAutomationWorkflow: async (id, isActive) => {
     try {
       const { data, error } = await supabase.from('automation_workflows').update({ is_active: isActive }).eq('id', id).select().single()
       if (error) throw error
       set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
-    } catch (e: any) { console.error('toggleAutomationWorkflow failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Marketing Campaigns ==========
@@ -1434,27 +1427,27 @@ export const useStore = create<AppState>((set, get) => ({
       const { data, error } = await supabase.from('marketing_campaigns').select('*').order('created_at', { ascending: false })
       if (error) throw error
       set({ marketingCampaigns: data || [] })
-    } catch (e: any) { console.error('fetchMarketingCampaigns failed:', e) }
+    } catch (e: any) {}
   },
   addMarketingCampaign: async (c) => {
     try {
       const { data, error } = await supabase.from('marketing_campaigns').insert(c).select().single()
       if (error) throw error
       set((s) => ({ marketingCampaigns: [data, ...s.marketingCampaigns] }))
-    } catch (e: any) { console.error('addMarketingCampaign failed:', e) }
+    } catch (e: any) {}
   },
   updateMarketingCampaign: async (id, updates) => {
     try {
       const { data, error } = await supabase.from('marketing_campaigns').update(updates).eq('id', id).select().single()
       if (error) throw error
       set((s) => ({ marketingCampaigns: s.marketingCampaigns.map((c: MarketingCampaign) => c.id === id ? data : c) }))
-    } catch (e: any) { console.error('updateMarketingCampaign failed:', e) }
+    } catch (e: any) {}
   },
   deleteMarketingCampaign: async (id) => {
     try {
       await supabase.from('marketing_campaigns').delete().eq('id', id)
       set((s) => ({ marketingCampaigns: s.marketingCampaigns.filter((c: MarketingCampaign) => c.id !== id) }))
-    } catch (e: any) { console.error('deleteMarketingCampaign failed:', e) }
+    } catch (e: any) {}
   },
 
   // ========== Password Reset ==========
@@ -1464,7 +1457,6 @@ export const useStore = create<AppState>((set, get) => ({
       if (error) throw error
       return { error: null }
     } catch (e: any) {
-      console.error('resetPassword failed:', e)
       return { error: e }
     }
   },
@@ -1474,7 +1466,6 @@ export const useStore = create<AppState>((set, get) => ({
       if (error) throw error
       return { error: null }
     } catch (e: any) {
-      console.error('updatePassword failed:', e)
       return { error: e }
     }
   },

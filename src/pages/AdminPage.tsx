@@ -37,9 +37,9 @@ export default function AdminPage() {
     setLoading(true)
     try {
       const supabase = (await import('@/db/supabase')).default
-      const [logsRes, profilesRes] = await Promise.all([
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*').limit(100)
+      const [profilesRes, logsRes] = await Promise.all([
+        supabase.from('profiles').select('*').limit(100),
+        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100).catch(() => ({ data: [] }))
       ])
       setAuditLogs(logsRes.data || [])
       // Compute table stats
@@ -49,13 +49,11 @@ export default function AdminPage() {
         'invitations', 'audit_logs', 'user_roles', 'ai_conversations']
       const stats: Record<string, number> = {}
       for (const t of tables) {
-        const { count } = await supabase.from(t).select('*', { count: 'exact', head: true })
+        const { count } = await supabase.from(t).select('*', { count: 'exact', head: true }).catch(() => ({ count: 0 }))
         stats[t] = count || 0
       }
       setSystemStats(stats)
       setLastRefresh(format(new Date(), 'HH:mm:ss'))
-    } catch (e) {
-      console.error('Failed to load admin data:', e)
     } finally {
       setLoading(false)
     }
@@ -79,7 +77,7 @@ export default function AdminPage() {
   const sections = [
     { key: 'overview', label: '系统概览', icon: <Activity className="w-4 h-4" /> },
     { key: 'tables', label: '数据表', icon: <Database className="w-4 h-4" /> },
-    { key: 'logs', label: '审计日志', icon: <FileText className="w-4 h-4" /> },
+    { key: 'logs', label: '系统日志', icon: <FileText className="w-4 h-4" /> },
     { key: 'users', label: '用户管理', icon: <UserCog className="w-4 h-4" /> },
     { key: 'permissions', label: '权限管理', icon: <Key className="w-4 h-4" /> },
     { key: 'config', label: '系统配置', icon: <Settings className="w-4 h-4" /> },

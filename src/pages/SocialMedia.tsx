@@ -483,8 +483,6 @@ export default function SocialMedia() {
       const { fetchTrendingTopics } = useStore.getState()
       await fetchTrendingTopics()
       setTrendingLastRefresh(format(new Date(), 'HH:mm:ss'))
-    } catch (e) {
-      console.error('Refresh trending failed:', e)
     } finally {
       setTrendingRefreshing(false)
     }

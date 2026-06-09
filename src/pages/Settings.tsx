@@ -146,6 +146,8 @@ export default function Settings() {
   
   // 密码强度状态
   const [newPassword, setNewPassword] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>('weak')
   const [strengthText, setStrengthText] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -557,9 +559,9 @@ export default function Settings() {
 
   // 修改密码
   const handleChangePassword = async () => {
-    const cp = (document.getElementById('currentPassword') as HTMLInputElement)?.value
-    const np = (document.getElementById('newPassword') as HTMLInputElement)?.value
-    const cfp = (document.getElementById('confirmPassword') as HTMLInputElement)?.value
+    const cp = currentPassword
+    const np = newPassword
+    const cfp = confirmPassword
     
     if (!cp || !np || !cfp) { 
       toast('请填写所有密码字段', 'warning')
@@ -601,10 +603,9 @@ export default function Settings() {
         toast('修改失败: ' + updateError.message, 'error')
       } else {
         toast('密码修改成功', 'success')
-        ;(document.getElementById('currentPassword') as HTMLInputElement).value = ''
-        ;(document.getElementById('newPassword') as HTMLInputElement).value = ''
-        ;(document.getElementById('confirmPassword') as HTMLInputElement).value = ''
+        setCurrentPassword('')
         setNewPassword('')
+        setConfirmPassword('')
       }
     } catch (e: any) {
       toast('修改失败: ' + (e.message || '未知错误'), 'error')
@@ -896,7 +897,7 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">当前密码</Label>
-                <Input id="currentPassword" type="password" />
+                <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
               </div>
               
               <div className="space-y-2">
@@ -912,7 +913,7 @@ export default function Settings() {
               
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">确认新密码</Label>
-                <Input id="confirmPassword" type="password" />
+                <Input id="confirmPassword" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
               </div>
               
               <Button onClick={handleChangePassword} disabled={changingPassword}>

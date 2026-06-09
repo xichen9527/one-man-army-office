@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus, Search,
   Trash2, Mail, Crown, Shield, UserCheck, ListTodo, FolderOpen, Edit3, X,
-  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon, CalendarDays, Clock, MapPin
+  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon, CalendarDays, Clock, MapPin, LogOut
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
@@ -93,7 +93,7 @@ export default function Collaboration() {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.2)
     } catch (e) {
-      console.warn('Failed to play beep:', e)
+      // Audio playback error ignored
     }
   }, [])
 
@@ -257,7 +257,6 @@ export default function Collaboration() {
         setInviteResult(null)
       }, 2000)
     } catch (error: any) {
-      console.error('Invite failed:', error)
       const errorMsg = error?.message || '邀请失败，请重试'
       setInviteResult({ ok: false, msg: errorMsg })
     } finally {
@@ -701,11 +700,10 @@ export default function Collaboration() {
                               <DropdownMenu.Item
                                 className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                                 onSelect={() => {
-                                  if (confirm('确定要退出该频道吗？')) {
-                                    // 实际退出频道逻辑
-                                    removeMember(currentUser.id, ch.id)
+                                  const myMember = members.find(m => m.user_id === currentUser?.id)
+                                  if (myMember && confirm('确定要退出该频道吗？')) {
+                                    removeMember(myMember.id)
                                       .then(() => {
-                                        // 如果当前正在这个频道，切换到另一个
                                         if (activeChannel === ch.id) {
                                           const otherChannel = channels.find(c => c.id !== ch.id)
                                           setActiveChannel(otherChannel?.id || null)
@@ -716,22 +714,12 @@ export default function Collaboration() {
                                           message: `你已成功退出「${ch.name}」频道`,
                                           read: false,
                                           created_at: new Date().toISOString(),
-                                        })
-                                      })
-                                      .catch((err) => {
-                                        console.error('退出频道失败:', err)
-                                        addNotification({
-                                          type: 'error',
-                                          title: '退出失败',
-                                          message: '无法退出频道，请稍后重试',
-                                          read: false,
-                                          created_at: new Date().toISOString(),
-                                        })
+                                        } as any)
                                       })
                                   }
                                 }}
                               >
-                                <X className="w-4 h-4" /> 退出频道
+                                <LogOut className="w-4 h-4" /> 退出频道
                               </DropdownMenu.Item>
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>

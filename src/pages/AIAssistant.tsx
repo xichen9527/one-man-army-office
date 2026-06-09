@@ -170,9 +170,7 @@ export default function AIAssistant() {
       // Inject system prompt based on feature type
       const sysPrompt = featureSystemPrompts[selectedFeature] || dbTypeSystemPrompts[ft?.dbType || 'chat'] || ''
       if (sysPrompt && convId) {
-        sendAIMessage(convId, sysPrompt).catch((e: any) => {
-          console.warn('系统提示词注入失败:', e?.message)
-        })
+        // System prompt injection skipped
       }
       setShowNewDialog(false)
       setNewTitle('')

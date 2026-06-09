@@ -148,7 +148,7 @@ function MembersTab() {
   const handleAdd = async () => {
     if (!memberEmail.trim() || !activeProjectId) return
     try {
-      await addWorkspaceMember({ project_id: activeProjectId, user_email: memberEmail, role: memberRole, joined_at: new Date().toISOString() })
+      await addWorkspaceMember({ workspace_id: activeProjectId, email: memberEmail, role: memberRole, user_id: 'pending', full_name: memberEmail.split('@')[0] })
       setShowDialog(false); setMemberEmail(''); setMemberRole('viewer')
     } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
   }
@@ -1667,12 +1667,12 @@ export default function ProjectManagement() {
                   try {
                     await updateProject(shareModal.itemId, { is_public: isPublic })
                     setActionSuccess(isPublic ? 'Project is now public' : 'Project is now private')
-                  } catch (e) { console.error('share visibility update failed:', e); setActionError('Failed to update sharing settings') }
+                  } catch (e) { setActionError('Failed to update sharing settings') }
                 } else if (shareModal.itemType === 'document') {
                   try {
                     await updateDocument(shareModal.itemId, { is_public: isPublic })
                     setActionSuccess(isPublic ? 'Document is now public' : 'Document is now private')
-                  } catch (e) { console.error(e); setActionError('Failed to update sharing settings') }
+                  } catch (e) { setActionError('Failed to update sharing settings') }
                 }
                 setShareModal(s => s ? { ...s, isPublic } : null)
               }}

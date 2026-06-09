@@ -29,6 +29,8 @@ export interface Database {
       content_templates: { Row: ContentTemplate; Insert: ContentTemplateInsert; Update: ContentTemplateUpdate }
       automation_workflows: { Row: AutomationWorkflow; Insert: AutomationWorkflowInsert; Update: AutomationWorkflowUpdate }
       marketing_campaigns: { Row: MarketingCampaign; Insert: MarketingCampaignInsert; Update: MarketingCampaignUpdate }
+      audit_logs: { Row: AuditLog; Insert: AuditLogInsert; Update: AuditLogUpdate }
+      user_roles: { Row: UserRole; Insert: UserRoleInsert; Update: UserRoleUpdate }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -607,3 +609,34 @@ export type MarketingCampaignInsert = Omit<MarketingCampaign, 'id' | 'created_at
 export type MarketingCampaignUpdate = Partial<Omit<MarketingCampaign, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
 
 // ==================== Task Report ====================
+
+// ==================== Audit Log ====================
+export interface AuditLog {
+  id: string
+  user_id: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  details: any
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export type AuditLogInsert = Omit<AuditLog, 'id' | 'created_at'>
+export type AuditLogUpdate = Partial<Omit<AuditLog, 'id' | 'created_at'>>
+
+// ==================== User Role ====================
+export interface UserRole {
+  id: string
+  user_id: string
+  role: 'admin' | 'manager' | 'user'
+  permissions: any
+  assigned_by: string | null
+  assigned_at: string
+  created_at: string
+  updated_at: string
+}
+
+export type UserRoleInsert = Omit<UserRole, 'id' | 'created_at' | 'updated_at'>
+export type UserRoleUpdate = Partial<Omit<UserRole, 'id' | 'created_at' | 'updated_at'>>

@@ -261,12 +261,10 @@ export default function VideoConference() {
   // 会议操作按钮逻辑
   const toggleMic = () => {
     setMicOn(!micOn)
-    console.log('麦克风:', !micOn ? '开启' : '关闭')
   }
 
   const toggleCam = () => {
     setCamOn(!camOn)
-    console.log('摄像头:', !camOn ? '开启' : '关闭')
   }
 
   const toggleScreenShare = async () => {
@@ -274,13 +272,11 @@ export default function VideoConference() {
       try {
         await navigator.mediaDevices.getDisplayMedia({ video: true })
         setScreenShare(true)
-        console.log('开始屏幕共享')
       } catch (err) {
-        console.error('屏幕共享失败:', err)
+        toast('屏幕共享失败', 'error')
       }
     } else {
       setScreenShare(false)
-      console.log('停止屏幕共享')
     }
   }
 

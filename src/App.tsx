@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react'
+﻿import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from '@/store'
 import MainLayout from '@/components/layouts/MainLayout'
@@ -101,8 +101,7 @@ export default function App() {
           <Route path="collaboration" element={<Suspense fallback={<LoadingFallback />}><Collaboration /></Suspense>} />
           <Route path="crm" element={<Suspense fallback={<LoadingFallback />}><CRM /></Suspense>} />
           <Route path="social-media" element={<Suspense fallback={<LoadingFallback />}><SocialMedia /></Suspense>} />
-          // projects route merged into project-management
-          <Route path="projects/:id" element={<Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense>} />
+            <Route path="projects/:id" element={<Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense>} />
           <Route path="video-conference" element={<Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<LoadingFallback />}><Settings /></Suspense>} />
           <Route path="admin" element={<Suspense fallback={<LoadingFallback />}><AdminPage /></Suspense>} />
