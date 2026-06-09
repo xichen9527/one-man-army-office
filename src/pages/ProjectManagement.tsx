@@ -18,10 +18,11 @@ import {
   Plus, ListTodo, KanbanSquare, Search, Filter,
   MoreHorizontal, Edit, Trash2, UserPlus, Calendar,
   AlertCircle, CheckCircle2, Clock, ArrowRight, GripVertical,
-  ChevronUp, ChevronDown, Users, X, AlertTriangle,
+  ChevronUp, ChevronDown, Users2, X, AlertTriangle,
   FolderOpen, FileText, Upload, Eye, FolderKanban, File, Download,
   History, FolderTree, Grid, List, HardDrive, RotateCcw,
   Save, Edit3, ChevronRight, Share2,
+  Layout, Users as UsersIcon,
 } from 'lucide-react'
 import ShareModal from '@/components/ui/share-modal'
 import { useStore } from '@/store'
@@ -134,6 +135,170 @@ function generateVersionHistory(doc: any) {
 
 
 // ==================== Main Component ====================
+// ========== Members Tab ==========
+function MembersTab() {
+  const { workspaceMembers, fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMember, removeWorkspaceMember } = useStore()
+  const [showDialog, setShowDialog] = useState(false)
+  const [memberEmail, setMemberEmail] = useState('')
+  const [memberRole, setMemberRole] = useState<'admin' | 'editor' | 'viewer'>('viewer')
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+
+  useEffect(() => { fetchWorkspaceMembers() }, [])
+
+  const handleAdd = async () => {
+    if (!memberEmail.trim() || !activeProjectId) return
+    try {
+      await addWorkspaceMember({ project_id: activeProjectId, user_email: memberEmail, role: memberRole, joined_at: new Date().toISOString() })
+      setShowDialog(false); setMemberEmail(''); setMemberRole('viewer')
+    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
+  }
+
+  const roleLabels = { owner: '所有者', admin: '管理员', editor: '编辑者', viewer: '查看者' }
+  const roleColor = { owner: 'text-purple-600', admin: 'text-blue-600', editor: 'text-green-600', viewer: 'text-gray-500' }
+
+  return (
+    <>
+      <div className="flex justify-end mb-4">
+        <Button size="sm" onClick={() => { setActiveProjectId(null); setShowDialog(true) }}>
+          <Plus className="w-4 h-4 mr-1" /> 添加成员
+        </Button>
+      </div>
+      {workspaceMembers.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">暂无成员，点击右上角添加</div>
+      ) : (
+        <div className="space-y-2">
+          {workspaceMembers.map(m => (
+            <Card key={m.id}>
+              <CardContent className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-8 h-8"><AvatarFallback className="text-xs bg-gray-100">{m.user_email?.[0]?.toUpperCase() || '?'}</AvatarFallback></Avatar>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{m.user_email || '—'}</p>
+                    <p className="text-xs text-gray-400">{m.joined_at ? new Date(m.joined_at).toLocaleDateString('zh-CN') : ''}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <select value={m.role} onChange={async (e) => { try { await updateWorkspaceMember(m.id, { role: e.target.value as any }) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } }} className="text-xs border rounded px-2 py-1">
+                    <option value="admin">管理员</option><option value="editor">编辑者</option><option value="viewer">查看者</option>
+                  </select>
+                  {m.role !== 'owner' && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { if (confirm('确认移除？')) { try { await removeWorkspaceMember(m.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } } }}>
+                      <X className="w-3.5 h-3.5 text-red-400" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>添加成员</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>邮箱</Label><Input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="member@example.com" /></div>
+            <div><Label>角色</Label>
+              <select value={memberRole} onChange={e => setMemberRole(e.target.value as any)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                <option value="admin">管理员</option><option value="editor">编辑者</option><option value="viewer">查看者</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleAdd}>添加</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ========== Templates Tab ==========
+function TemplatesTab() {
+  const { workspaceTemplates, fetchWorkspaceTemplates, addWorkspaceTemplate, deleteWorkspaceTemplate, projects } = useStore()
+  const [showDialog, setShowDialog] = useState(false)
+  const [tName, setTName] = useState('')
+  const [tDesc, setTDesc] = useState('')
+  const [tCategory, setTCategory] = useState('general')
+  const [sourceProjectId, setSourceProjectId] = useState('')
+
+  useEffect(() => { fetchWorkspaceTemplates() }, [])
+
+  const categories = useMemo(() => {
+    const cats: Record<string, typeof workspaceTemplates> = {}
+    workspaceTemplates.forEach(t => { const c = (t as any).category || 'general'; if (!cats[c]) cats[c] = []; cats[c].push(t) })
+    return cats
+  }, [workspaceTemplates])
+
+  const handleCreate = async () => {
+    if (!tName.trim()) return
+    try {
+      await addWorkspaceTemplate({ name: tName, description: tDesc, category: tCategory, structure: {}, usage_count: 0, created_by: '' })
+      setShowDialog(false); setTName(''); setTDesc(''); setTCategory('general')
+    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
+  }
+
+  return (
+    <>
+      <div className="flex justify-end mb-4">
+        <Button size="sm" onClick={() => { setTName(''); setTDesc(''); setTCategory('general'); setShowDialog(true) }}>
+          <Plus className="w-4 h-4 mr-1" /> 创建模板
+        </Button>
+      </div>
+      {workspaceTemplates.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">暂无模板，点击右上角创建</div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(categories).map(([cat, tmpls]) => (
+            <div key={cat}>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 capitalize">{cat === 'general' ? '通用' : cat}</h3>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {tmpls.map(t => (
+                  <Card key={t.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 truncate">{t.name}</p>
+                          <p className="text-xs text-gray-500 line-clamp-2 mt-1">{t.description || '—'}</p>
+                        </div>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 ml-2" onClick={async (e) => { e.stopPropagation(); if (confirm('确认删除？')) { try { await deleteWorkspaceTemplate(t.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } } }}>
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="text-xs">{cat === 'general' ? '通用' : cat}</Badge>
+                        <span className="text-xs text-gray-400">使用 {t.usage_count || 0} 次</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>创建工作空间模板</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>模板名称</Label><Input value={tName} onChange={e => setTName(e.target.value)} placeholder="如: 产品开发模板" /></div>
+            <div><Label>描述</Label><Input value={tDesc} onChange={e => setTDesc(e.target.value)} placeholder="模板描述" /></div>
+            <div><Label>分类</Label>
+              <select value={tCategory} onChange={e => setTCategory(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                <option value="general">通用</option><option value="product">产品开发</option><option value="marketing">市场营销</option><option value="design">设计</option><option value="research">研究</option>
+              </select>
+            </div>
+            <div><Label>复制项目结构（可选）</Label>
+              <select value={sourceProjectId} onChange={e => setSourceProjectId(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                <option value="">— 不复制 —</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleCreate}>创建</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 export default function ProjectManagement() {
   const navigate = useNavigate()
   const {
@@ -142,6 +307,8 @@ export default function ProjectManagement() {
     addProject, updateProject, deleteProject,
     addDocument, updateDocument, deleteDocument,
     uploadFile, deleteFile,
+    workspaceMembers, fetchWorkspaceMembers, addWorkspaceMember, updateWorkspaceMember, removeWorkspaceMember,
+    workspaceTemplates, fetchWorkspaceTemplates, addWorkspaceTemplate, deleteWorkspaceTemplate,
   } = useStore()
 
   // ========== Tab State ==========
@@ -558,6 +725,8 @@ export default function ProjectManagement() {
           <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="w-4 h-4" />任务看板</TabsTrigger>
           <TabsTrigger value="documents" className="gap-1.5"><FileText className="w-4 h-4" />文档中心</TabsTrigger>
           <TabsTrigger value="files" className="gap-1.5"><Upload className="w-4 h-4" />文件管理</TabsTrigger>
+          <TabsTrigger value="members" className="gap-1.5"><UsersIcon className="w-4 h-4" />成员</TabsTrigger>
+          <TabsTrigger value="templates" className="gap-1.5"><Layout className="w-4 h-4" />模板</TabsTrigger>
         </TabsList>
 
 
@@ -1313,6 +1482,8 @@ export default function ProjectManagement() {
           )}
         </TabsContent>
 
+        <MembersTab />
+        <TemplatesTab />
         {/* =============== Tab: 文件管理 =============== */}
         <TabsContent value="files" className="space-y-4">
           {/* Storage Usage */}

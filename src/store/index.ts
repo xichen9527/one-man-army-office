@@ -20,6 +20,12 @@ import type {
   Invitation, InvitationInsert, InvitationUpdate,
   DBFile, DBFileInsert, DBFileUpdate,
   Schedule, ScheduleInsert, ScheduleUpdate,
+  TaskReport, TaskReportInsert, TaskReportUpdate,
+  WorkspaceMember, WorkspaceMemberInsert, WorkspaceMemberUpdate,
+  WorkspaceTemplate, WorkspaceTemplateInsert, WorkspaceTemplateUpdate,
+  ContentTemplate, ContentTemplateInsert, ContentTemplateUpdate,
+  AutomationWorkflow, AutomationWorkflowInsert, AutomationWorkflowUpdate,
+  MarketingCampaign, MarketingCampaignInsert, MarketingCampaignUpdate,
 } from '@/types/database'
 
 // ==================== Store State ====================
@@ -151,6 +157,50 @@ interface AppState {
   addSchedule: (s: Omit<ScheduleInsert, 'user_id'>) => Promise<void>
   updateSchedule: (id: string, updates: ScheduleUpdate) => Promise<void>
   deleteSchedule: (id: string) => Promise<void>
+
+  // Task Reports
+  taskReports: TaskReport[]
+  fetchTaskReports: (projectId?: string) => Promise<void>
+  addTaskReport: (r: Omit<TaskReportInsert, 'user_id'>) => Promise<void>
+  deleteTaskReport: (id: string) => Promise<void>
+
+  // Workspace Members
+  workspaceMembers: WorkspaceMember[]
+  fetchWorkspaceMembers: (workspaceId: string) => Promise<void>
+  addWorkspaceMember: (m: Omit<WorkspaceMemberInsert, 'workspace_id'>) => Promise<void>
+  updateWorkspaceMember: (id: string, updates: WorkspaceMemberUpdate) => Promise<void>
+  removeWorkspaceMember: (id: string) => Promise<void>
+
+  // Workspace Templates
+  workspaceTemplates: WorkspaceTemplate[]
+  fetchWorkspaceTemplates: () => Promise<void>
+  addWorkspaceTemplate: (t: Omit<WorkspaceTemplateInsert, 'creator_id'>) => Promise<void>
+  deleteWorkspaceTemplate: (id: string) => Promise<void>
+
+  // Content Templates
+  contentTemplates: ContentTemplate[]
+  fetchContentTemplates: (category?: string) => Promise<void>
+  addContentTemplate: (t: Omit<ContentTemplateInsert, 'creator_id'>) => Promise<void>
+  deleteContentTemplate: (id: string) => Promise<void>
+
+  // Automation Workflows
+  automationWorkflows: AutomationWorkflow[]
+  fetchAutomationWorkflows: () => Promise<void>
+  addAutomationWorkflow: (w: Omit<AutomationWorkflowInsert, 'creator_id'>) => Promise<void>
+  updateAutomationWorkflow: (id: string, updates: AutomationWorkflowUpdate) => Promise<void>
+  deleteAutomationWorkflow: (id: string) => Promise<void>
+  toggleAutomationWorkflow: (id: string, isActive: boolean) => Promise<void>
+
+  // Marketing Campaigns
+  marketingCampaigns: MarketingCampaign[]
+  fetchMarketingCampaigns: () => Promise<void>
+  addMarketingCampaign: (c: Omit<MarketingCampaignInsert, 'owner_id'>) => Promise<void>
+  updateMarketingCampaign: (id: string, updates: MarketingCampaignUpdate) => Promise<void>
+  deleteMarketingCampaign: (id: string) => Promise<void>
+
+  // Password Reset
+  resetPassword: (email: string) => Promise<{ error: any }>
+  updatePassword: (newPassword: string) => Promise<{ error: any }>
 }
 
 export type ConferenceStatus = Conference['status']
@@ -1235,6 +1285,198 @@ export const useStore = create<AppState>((set, get) => ({
       await supabase.from('schedules').delete().eq('id', id)
       set((s) => ({ schedules: s.schedules.filter((sc: Schedule) => sc.id !== id) }))
     } catch (e) { console.error('deleteSchedule failed:', e) }
+  },
+
+  // ========== Task Reports ==========
+  taskReports: [],
+  fetchTaskReports: async (projectId?: string) => {
+    try {
+      let q = supabase.from('task_reports').select('*').order('created_at', { ascending: false })
+      if (projectId) q = q.eq('project_id', projectId)
+      const { data, error } = await q
+      if (error) throw error
+      set({ taskReports: data || [] })
+    } catch (e: any) { console.error('fetchTaskReports failed:', e) }
+  },
+  addTaskReport: async (r) => {
+    try {
+      const { data, error } = await supabase.from('task_reports').insert(r).select().single()
+      if (error) throw error
+      set((s) => ({ taskReports: [data, ...s.taskReports] }))
+    } catch (e: any) { console.error('addTaskReport failed:', e) }
+  },
+  deleteTaskReport: async (id) => {
+    try {
+      await supabase.from('task_reports').delete().eq('id', id)
+      set((s) => ({ taskReports: s.taskReports.filter((r: TaskReport) => r.id !== id) }))
+    } catch (e: any) { console.error('deleteTaskReport failed:', e) }
+  },
+
+  // ========== Workspace Members ==========
+  workspaceMembers: [],
+  fetchWorkspaceMembers: async (workspaceId: string) => {
+    try {
+      const { data, error } = await supabase.from('workspace_members').select('*').eq('workspace_id', workspaceId).order('joined_at', { ascending: false })
+      if (error) throw error
+      set({ workspaceMembers: data || [] })
+    } catch (e: any) { console.error('fetchWorkspaceMembers failed:', e) }
+  },
+  addWorkspaceMember: async (m) => {
+    try {
+      const { data, error } = await supabase.from('workspace_members').insert(m).select().single()
+      if (error) throw error
+      set((s) => ({ workspaceMembers: [data, ...s.workspaceMembers] }))
+    } catch (e: any) { console.error('addWorkspaceMember failed:', e) }
+  },
+  updateWorkspaceMember: async (id, updates) => {
+    try {
+      const { data, error } = await supabase.from('workspace_members').update(updates).eq('id', id).select().single()
+      if (error) throw error
+      set((s) => ({ workspaceMembers: s.workspaceMembers.map((m: WorkspaceMember) => m.id === id ? data : m) }))
+    } catch (e: any) { console.error('updateWorkspaceMember failed:', e) }
+  },
+  removeWorkspaceMember: async (id) => {
+    try {
+      await supabase.from('workspace_members').delete().eq('id', id)
+      set((s) => ({ workspaceMembers: s.workspaceMembers.filter((m: WorkspaceMember) => m.id !== id) }))
+    } catch (e: any) { console.error('removeWorkspaceMember failed:', e) }
+  },
+
+  // ========== Workspace Templates ==========
+  workspaceTemplates: [],
+  fetchWorkspaceTemplates: async () => {
+    try {
+      const { data, error } = await supabase.from('workspace_templates').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      set({ workspaceTemplates: data || [] })
+    } catch (e: any) { console.error('fetchWorkspaceTemplates failed:', e) }
+  },
+  addWorkspaceTemplate: async (t) => {
+    try {
+      const { data, error } = await supabase.from('workspace_templates').insert(t).select().single()
+      if (error) throw error
+      set((s) => ({ workspaceTemplates: [data, ...s.workspaceTemplates] }))
+    } catch (e: any) { console.error('addWorkspaceTemplate failed:', e) }
+  },
+  deleteWorkspaceTemplate: async (id) => {
+    try {
+      await supabase.from('workspace_templates').delete().eq('id', id)
+      set((s) => ({ workspaceTemplates: s.workspaceTemplates.filter((t: WorkspaceTemplate) => t.id !== id) }))
+    } catch (e: any) { console.error('deleteWorkspaceTemplate failed:', e) }
+  },
+
+  // ========== Content Templates ==========
+  contentTemplates: [],
+  fetchContentTemplates: async (category?: string) => {
+    try {
+      let q = supabase.from('content_templates').select('*').order('created_at', { ascending: false })
+      if (category) q = q.eq('category', category)
+      const { data, error } = await q
+      if (error) throw error
+      set({ contentTemplates: data || [] })
+    } catch (e: any) { console.error('fetchContentTemplates failed:', e) }
+  },
+  addContentTemplate: async (t) => {
+    try {
+      const { data, error } = await supabase.from('content_templates').insert(t).select().single()
+      if (error) throw error
+      set((s) => ({ contentTemplates: [data, ...s.contentTemplates] }))
+    } catch (e: any) { console.error('addContentTemplate failed:', e) }
+  },
+  deleteContentTemplate: async (id) => {
+    try {
+      await supabase.from('content_templates').delete().eq('id', id)
+      set((s) => ({ contentTemplates: s.contentTemplates.filter((t: ContentTemplate) => t.id !== id) }))
+    } catch (e: any) { console.error('deleteContentTemplate failed:', e) }
+  },
+
+  // ========== Automation Workflows ==========
+  automationWorkflows: [],
+  fetchAutomationWorkflows: async () => {
+    try {
+      const { data, error } = await supabase.from('automation_workflows').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      set({ automationWorkflows: data || [] })
+    } catch (e: any) { console.error('fetchAutomationWorkflows failed:', e) }
+  },
+  addAutomationWorkflow: async (w) => {
+    try {
+      const { data, error } = await supabase.from('automation_workflows').insert(w).select().single()
+      if (error) throw error
+      set((s) => ({ automationWorkflows: [data, ...s.automationWorkflows] }))
+    } catch (e: any) { console.error('addAutomationWorkflow failed:', e) }
+  },
+  updateAutomationWorkflow: async (id, updates) => {
+    try {
+      const { data, error } = await supabase.from('automation_workflows').update(updates).eq('id', id).select().single()
+      if (error) throw error
+      set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
+    } catch (e: any) { console.error('updateAutomationWorkflow failed:', e) }
+  },
+  deleteAutomationWorkflow: async (id) => {
+    try {
+      await supabase.from('automation_workflows').delete().eq('id', id)
+      set((s) => ({ automationWorkflows: s.automationWorkflows.filter((w: AutomationWorkflow) => w.id !== id) }))
+    } catch (e: any) { console.error('deleteAutomationWorkflow failed:', e) }
+  },
+  toggleAutomationWorkflow: async (id, isActive) => {
+    try {
+      const { data, error } = await supabase.from('automation_workflows').update({ is_active: isActive }).eq('id', id).select().single()
+      if (error) throw error
+      set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
+    } catch (e: any) { console.error('toggleAutomationWorkflow failed:', e) }
+  },
+
+  // ========== Marketing Campaigns ==========
+  marketingCampaigns: [],
+  fetchMarketingCampaigns: async () => {
+    try {
+      const { data, error } = await supabase.from('marketing_campaigns').select('*').order('created_at', { ascending: false })
+      if (error) throw error
+      set({ marketingCampaigns: data || [] })
+    } catch (e: any) { console.error('fetchMarketingCampaigns failed:', e) }
+  },
+  addMarketingCampaign: async (c) => {
+    try {
+      const { data, error } = await supabase.from('marketing_campaigns').insert(c).select().single()
+      if (error) throw error
+      set((s) => ({ marketingCampaigns: [data, ...s.marketingCampaigns] }))
+    } catch (e: any) { console.error('addMarketingCampaign failed:', e) }
+  },
+  updateMarketingCampaign: async (id, updates) => {
+    try {
+      const { data, error } = await supabase.from('marketing_campaigns').update(updates).eq('id', id).select().single()
+      if (error) throw error
+      set((s) => ({ marketingCampaigns: s.marketingCampaigns.map((c: MarketingCampaign) => c.id === id ? data : c) }))
+    } catch (e: any) { console.error('updateMarketingCampaign failed:', e) }
+  },
+  deleteMarketingCampaign: async (id) => {
+    try {
+      await supabase.from('marketing_campaigns').delete().eq('id', id)
+      set((s) => ({ marketingCampaigns: s.marketingCampaigns.filter((c: MarketingCampaign) => c.id !== id) }))
+    } catch (e: any) { console.error('deleteMarketingCampaign failed:', e) }
+  },
+
+  // ========== Password Reset ==========
+  resetPassword: async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
+      if (error) throw error
+      return { error: null }
+    } catch (e: any) {
+      console.error('resetPassword failed:', e)
+      return { error: e }
+    }
+  },
+  updatePassword: async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      return { error: null }
+    } catch (e: any) {
+      console.error('updatePassword failed:', e)
+      return { error: e }
+    }
   },
 
   // ========== Realtime Subscriptions ==========

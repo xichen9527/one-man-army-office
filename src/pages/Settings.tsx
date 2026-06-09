@@ -18,14 +18,18 @@ import {
   Check,
   Bot,
   Plus,
-  Trash2,
+  Trash2 as Trash2Icon,
   Edit3,
   Key,
   Link,
   CheckCircle,
   XCircle,
   Loader2,
-  Save
+  Save,
+  Zap,
+  Play,
+  Pause,
+  Settings as LucideSettingsIcon,
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { toast } from '@/components/ui/toast'
@@ -43,8 +47,96 @@ type PasswordStrength = 'weak' | 'medium' | 'strong'
 // 主题类型
 type Theme = 'light' | 'dark' | 'auto'
 
+// ========== Automation Workflow Tab ==========
+function AutomationTab() {
+  const { automationWorkflows, fetchAutomationWorkflows, addAutomationWorkflow, updateAutomationWorkflow, deleteAutomationWorkflow, toggleAutomationWorkflow } = useStore()
+  const [showDialog, setShowDialog] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [wfName, setWfName] = useState('')
+  const [wfDesc, setWfDesc] = useState('')
+  const [wfTrigger, setWfTrigger] = useState<'schedule' | 'event' | 'webhook'>('schedule')
+  const [wfConfig, setWfConfig] = useState('')
+  const [wfActions, setWfActions] = useState('')
+
+  useEffect(() => { fetchAutomationWorkflows() }, [])
+
+  const handleSave = async () => {
+    if (!wfName.trim()) return
+    try {
+      const data = { name: wfName, trigger_type: wfTrigger, trigger_config: wfConfig, actions: wfActions, is_active: true }
+      if (editId) {
+        await updateAutomationWorkflow(editId, { ...data, description: wfDesc })
+      } else {
+        await addAutomationWorkflow({ ...data, description: wfDesc, last_run_at: null, run_count: 0 })
+      }
+      setShowDialog(false); setEditId(null); setWfName(''); setWfDesc(''); setWfTrigger('schedule'); setWfConfig(''); setWfActions('')
+    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
+  }
+
+  const openEdit = (wf: any) => {
+    setEditId(wf.id); setWfName(wf.name); setWfDesc(wf.description || ''); setWfTrigger(wf.trigger_type); setWfConfig(typeof wf.trigger_config === 'string' ? wf.trigger_config : JSON.stringify(wf.trigger_config)); setWfActions(typeof wf.actions === 'string' ? wf.actions : JSON.stringify(wf.actions)); setShowDialog(true)
+  }
+
+  const triggerLabels = { schedule: '定时', event: '事件', webhook: 'Webhook' }
+
+  return (
+    <>
+      <div className="flex justify-end mb-4">
+        <Button size="sm" onClick={() => { setEditId(null); setWfName(''); setWfDesc(''); setWfTrigger('schedule'); setWfConfig(''); setWfActions(''); setShowDialog(true) }}>
+          <Plus className="w-4 h-4 mr-1" /> 创建工作流
+        </Button>
+      </div>
+      {automationWorkflows.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">暂无自动化工作流，点击右上角创建</div>
+      ) : (
+        <div className="grid gap-3">
+          {automationWorkflows.map(wf => (
+            <Card key={wf.id}>
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900 truncate">{wf.name}</span>
+                    <Badge variant="secondary" className="text-xs">{triggerLabels[wf.trigger_type]}</Badge>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{wf.description || '—'}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {wf.last_run_at ? `上次运行: ${new Date(wf.last_run_at).toLocaleString('zh-CN')}` : '从未运行'}
+                    {wf.run_count > 0 && ` · 运行 ${wf.run_count} 次`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={wf.is_active} onCheckedChange={async (v) => { try { await toggleAutomationWorkflow(wf.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } }} />
+                  <Button size="icon" variant="ghost" onClick={() => openEdit(wf)}><LucideSettingsIcon className="w-4 h-4" /></Button>
+                  <Button size="icon" variant="ghost" onClick={async () => { if (confirm('确认删除？')) { try { await deleteAutomationWorkflow(wf.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } } }}><Trash2Icon className="w-4 h-4 text-red-400" /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editId ? '编辑工作流' : '创建工作流'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>名称</Label><Input value={wfName} onChange={e => setWfName(e.target.value)} placeholder="工作流名称" /></div>
+            <div><Label>描述</Label><Input value={wfDesc} onChange={e => setWfDesc(e.target.value)} placeholder="可选描述" /></div>
+            <div><Label>触发类型</Label>
+              <select value={wfTrigger} onChange={e => setWfTrigger(e.target.value as any)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                <option value="schedule">定时</option><option value="event">事件</option><option value="webhook">Webhook</option>
+              </select>
+            </div>
+            <div><Label>触发配置（JSON）</Label><textarea value={wfConfig} onChange={e => setWfConfig(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm h-16 font-mono" placeholder='{"cron": "0 9 * * *"}' /></div>
+            <div><Label>执行动作（JSON）</Label><textarea value={wfActions} onChange={e => setWfActions(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm h-20 font-mono" placeholder='{"type": "email", "to": "..."}' /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleSave}>保存</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 export default function Settings() {
-  const { currentUser } = useStore()
+  const { currentUser, automationWorkflows, fetchAutomationWorkflows, addAutomationWorkflow, updateAutomationWorkflow, deleteAutomationWorkflow, toggleAutomationWorkflow } = useStore()
   const [fullName, setFullName] = useState(currentUser?.full_name || '')
   const [username, setUsername] = useState(currentUser?.username || '')
   const [saved, setSaved] = useState(false)
@@ -582,6 +674,10 @@ export default function Settings() {
             <Shield className="mr-2 h-4 w-4" />
             安全设置
           </TabsTrigger>
+          <TabsTrigger value="automation">
+            <Zap className="mr-2 h-4 w-4" />
+            自动化
+          </TabsTrigger>
           <TabsTrigger value="appearance">
             <Palette className="mr-2 h-4 w-4" />
             外观设置
@@ -785,6 +881,9 @@ export default function Settings() {
         </TabsContent>
 
         {/* 安全设置 */}
+        <TabsContent value="automation" className="space-y-4">
+          <AutomationTab />
+        </TabsContent>
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
@@ -1163,7 +1262,7 @@ function AIModelSettings() {
               {testing === api.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
             </Button>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(api)}><Edit3 className="w-3.5 h-3.5" /></Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-red-500" onClick={() => handleDelete(api.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-red-500" onClick={() => handleDelete(api.id)}><Trash2Icon className="w-3.5 h-3.5" /></Button>
           </div>
         </div>
       ))}

@@ -5,6 +5,7 @@ import MainLayout from '@/components/layouts/MainLayout'
 
 // 懒加载页面
 const Login = lazy(() => import('@/pages/Login'))
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 const Register = lazy(() => import('@/pages/Register'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const AIAssistant = lazy(() => import('@/pages/AIAssistant'))
@@ -87,6 +88,7 @@ export default function App() {
       <Routes>
         {/* 公开路由 - 已登录则跳转 */}
         <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Login /></Suspense></RedirectIfAuth>} />
+        <Route path="/reset-password" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ResetPassword /></Suspense></RedirectIfAuth>} />
         <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Register /></Suspense></RedirectIfAuth>} />
         <Route path="/invite/:token" element={<Suspense fallback={<LoadingFallback />}><Invite /></Suspense>} />
 

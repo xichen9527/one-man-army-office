@@ -8,9 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import {
-  Plus, Trash2, Edit3, RefreshCw, ExternalLink, Search,
+  Plus, Trash2 as Trash2Icon, Edit3 as Edit3Icon, RefreshCw, ExternalLink, Search,
   TrendingUp, TrendingDown, Minus, BarChart3, Users, Eye,
-  Heart, MessageCircle, Share2, Calendar, CheckCircle, XCircle,
+  FileText, Copy, Heart, MessageCircle, Share2, Calendar, CheckCircle, XCircle,
   Clock, MoreVertical, ArrowUpRight, Globe
 } from 'lucide-react'
 import { useStore } from '@/store'
@@ -58,6 +58,101 @@ function highlightHashtags(text: string): React.ReactNode[] {
   })
 }
 
+// ========== Content Templates Tab ==========
+function ContentTemplatesTab() {
+  const { contentTemplates, fetchContentTemplates, addContentTemplate, deleteContentTemplate } = useStore()
+  const [showDialog, setShowDialog] = useState(false)
+  const [tName, setTName] = useState('')
+  const [tCategory, setTCategory] = useState<'social' | 'email' | 'document' | 'presentation' | 'blog'>('social')
+  const [tContent, setTContent] = useState('')
+  const [tVariables, setTVariables] = useState('')
+  const [previewId, setPreviewId] = useState<string | null>(null)
+
+  useEffect(() => { fetchContentTemplates() }, [])
+
+  const catLabels: Record<string, string> = { social: '社交媒体', email: '邮件', document: '文档', presentation: '演示', blog: '博客' }
+
+  const handleSave = async () => {
+    if (!tName.trim()) return
+    try {
+      const vars = tVariables.split(',').map(v => v.trim()).filter(Boolean)
+      await addContentTemplate({ name: tName, category: tCategory, content: tContent, variables: vars, created_by: '', usage_count: 0 })
+      setShowDialog(false); setTName(''); setTCategory('social'); setTContent(''); setTVariables('')
+    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
+  }
+
+  const preview = (t: any) => {
+    const vars = (t.variables || []).map((v: string) => ({ name: v, value: `[${v}]` }))
+    return { ...t, content: vars.reduce((acc: string, vr: any) => acc.replace(new RegExp(`{{${vr.name}}}`, 'g'), vr.value), t.content || '') }
+  }
+
+  return (
+    <>
+      <div className="flex justify-end mb-4">
+        <Button size="sm" onClick={() => { setTName(''); setTCategory('social'); setTContent(''); setTVariables(''); setShowDialog(true) }}>
+          <Plus className="w-4 h-4 mr-1" /> 创建模板
+        </Button>
+      </div>
+      {contentTemplates.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">暂无内容模板，点击右上角创建</div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {contentTemplates.map(t => {
+            const p = preview(t)
+            return (
+              <Card key={t.id}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{t.name}</p>
+                      <Badge variant="secondary" className="mt-1 text-xs">{catLabels[t.category] || t.category}</Badge>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => navigator.clipboard?.writeText(t.content || '')}><Copy className="w-3.5 h-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { if (confirm('确认删除？')) deleteContentTemplate(t.id) }}><Trash2Icon className="w-3.5 h-3.5 text-red-400" /></Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-3">{t.content || '—'}</p>
+                  {t.variables?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {(t.variables as string[]).map((v: string) => <Badge key={v} variant="outline" className="text-[10px] px-1.5">{`{${v}}`}</Badge>)}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">使用 {t.usage_count || 0} 次</span>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPreviewId(previewId === t.id ? null : t.id)}>
+                      {previewId === t.id ? '收起' : '预览'}
+                    </Button>
+                  </div>
+                  {previewId === t.id && (
+                    <div className="bg-gray-50 rounded p-2 text-xs text-gray-700 whitespace-pre-wrap font-mono">{p.content}</div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>创建内容模板</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><label className="text-sm font-medium">名称</label><Input value={tName} onChange={e => setTName(e.target.value)} placeholder="模板名称" /></div>
+            <div><label className="text-sm font-medium">分类</label>
+              <select value={tCategory} onChange={e => setTCategory(e.target.value as any)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
+                <option value="social">社交媒体</option><option value="email">邮件</option><option value="document">文档</option><option value="presentation">演示</option><option value="blog">博客</option>
+              </select>
+            </div>
+            <div><label className="text-sm font-medium">内容</label><textarea value={tContent} onChange={e => setTContent(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm h-24" placeholder="模板内容，可使用变量 {{变量名}}" /></div>
+            <div><label className="text-sm font-medium">变量（逗号分隔）</label><Input value={tVariables} onChange={e => setTVariables(e.target.value)} placeholder="如: 标题, 链接, 日期" /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleSave}>保存</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 export default function SocialMedia() {
   const {
     socialAccounts, socialPosts, trendingTopics, currentUser,
@@ -65,6 +160,7 @@ export default function SocialMedia() {
     initiateOAuth, publishPost,
     addSocialPost, updateSocialPost, deleteSocialPost,
     syncSocialAccount,
+    contentTemplates, fetchContentTemplates, addContentTemplate, deleteContentTemplate,
   } = useStore()
 
   const [search, setSearch] = useState('')
@@ -421,9 +517,10 @@ export default function SocialMedia() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="accounts" className="gap-1.5"><Users className="w-4 h-4" />账号管理</TabsTrigger>
-          <TabsTrigger value="content" className="gap-1.5"><Edit3 className="w-4 h-4" />内容管理</TabsTrigger>
+          <TabsTrigger value="content" className="gap-1.5"><Edit3Icon className="w-4 h-4" />内容管理</TabsTrigger>
           <TabsTrigger value="trending" className="gap-1.5"><TrendingUp className="w-4 h-4" />热点追踪</TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="w-4 h-4" />数据分析</TabsTrigger>
+          <TabsTrigger value="templates" className="gap-1.5"><FileText className="w-4 h-4" />内容模板</TabsTrigger>
         </TabsList>
 
         {/* ========== Accounts ========== */}
@@ -473,7 +570,7 @@ export default function SocialMedia() {
                         </button>
                         <button onClick={() => setConfirmUnbindId(acc.id)}
                           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2Icon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -541,7 +638,7 @@ export default function SocialMedia() {
                           </Button>
                         )}
                         <button onClick={() => setConfirmDeletePostId(post.id)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2Icon className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
@@ -711,6 +808,7 @@ export default function SocialMedia() {
         </TabsContent>
 
         {/* ========== Analytics ========== */}
+        <ContentTemplatesTab />
         <TabsContent value="analytics">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Per-platform stats */}

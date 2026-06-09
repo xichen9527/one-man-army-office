@@ -1,4 +1,4 @@
-// 由 supabase gen types 生成，手动对齐 schema.sql
+// 鐢?supabase gen types 鐢熸垚锛屾墜鍔ㄥ榻?schema.sql
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export interface Database {
@@ -23,6 +23,12 @@ export interface Database {
       invitations: { Row: Invitation; Insert: InvitationInsert; Update: InvitationUpdate }
       files: { Row: DBFile; Insert: DBFileInsert; Update: DBFileUpdate }
       followups: { Row: Followup; Insert: FollowupInsert; Update: FollowupUpdate }
+      task_reports: { Row: TaskReport; Insert: TaskReportInsert; Update: TaskReportUpdate }
+      workspace_members: { Row: WorkspaceMember; Insert: WorkspaceMemberInsert; Update: WorkspaceMemberUpdate }
+      workspace_templates: { Row: WorkspaceTemplate; Insert: WorkspaceTemplateInsert; Update: WorkspaceTemplateUpdate }
+      content_templates: { Row: ContentTemplate; Insert: ContentTemplateInsert; Update: ContentTemplateUpdate }
+      automation_workflows: { Row: AutomationWorkflow; Insert: AutomationWorkflowInsert; Update: AutomationWorkflowUpdate }
+      marketing_campaigns: { Row: MarketingCampaign; Insert: MarketingCampaignInsert; Update: MarketingCampaignUpdate }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -491,4 +497,113 @@ export interface Note {
   is_archived: boolean
   created_at: string
   updated_at: string
-}>
+}
+
+// ==================== Task Reports ====================
+export interface TaskReport {
+  id: string
+  user_id: string
+  project_id: string | null
+  title: string
+  report_type: 'weekly' | 'monthly' | 'custom'
+  start_date: string
+  end_date: string
+  completion_rate: number
+  summary: string | null
+  metadata: Json
+  created_at: string
+}
+export type TaskReportInsert = Omit<TaskReport, 'id' | 'created_at'>
+export type TaskReportUpdate = Partial<Omit<TaskReport, 'id' | 'user_id' | 'created_at'>>
+
+// ==================== Workspace Members ====================
+export interface WorkspaceMember {
+  id: string
+  workspace_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'editor' | 'viewer'
+  joined_at: string
+  invited_by: string | null
+  full_name: string | null
+  email: string | null
+  metadata: Json
+}
+export type WorkspaceMemberInsert = Omit<WorkspaceMember, 'id' | 'joined_at'>
+export type WorkspaceMemberUpdate = Partial<Omit<WorkspaceMember, 'id' | 'workspace_id' | 'user_id' | 'joined_at'>>
+
+// ==================== Workspace Templates ====================
+export interface WorkspaceTemplate {
+  id: string
+  name: string
+  description: string | null
+  category: string | null
+  icon: string | null
+  structure: Json
+  usage_count: number
+  is_public: boolean
+  creator_id: string
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type WorkspaceTemplateInsert = Omit<WorkspaceTemplate, 'id' | 'created_at' | 'updated_at' | 'usage_count'>
+export type WorkspaceTemplateUpdate = Partial<Omit<WorkspaceTemplate, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
+
+// ==================== Content Templates ====================
+export interface ContentTemplate {
+  id: string
+  name: string
+  description: string | null
+  category: 'social' | 'email' | 'document' | 'presentation' | 'blog'
+  content: string
+  variables: string[] | null
+  creator_id: string
+  is_public: boolean
+  usage_count: number
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type ContentTemplateInsert = Omit<ContentTemplate, 'id' | 'created_at' | 'updated_at' | 'usage_count'>
+export type ContentTemplateUpdate = Partial<Omit<ContentTemplate, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
+
+// ==================== Automation Workflows ====================
+export interface AutomationWorkflow {
+  id: string
+  name: string
+  description: string | null
+  trigger_type: 'schedule' | 'event' | 'webhook'
+  trigger_config: Json
+  action_config: Json
+  is_active: boolean
+  last_run_at: string | null
+  run_count: number
+  creator_id: string
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type AutomationWorkflowInsert = Omit<AutomationWorkflow, 'id' | 'created_at' | 'updated_at' | 'run_count' | 'last_run_at'>
+export type AutomationWorkflowUpdate = Partial<Omit<AutomationWorkflow, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
+
+// ==================== Marketing Campaigns ====================
+export interface MarketingCampaign {
+  id: string
+  name: string
+  description: string | null
+  status: 'draft' | 'active' | 'paused' | 'completed'
+  budget: number | null
+  spent: number
+  start_date: string | null
+  end_date: string | null
+  target_audience: string | null
+  channels: string[] | null
+  owner_id: string
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type MarketingCampaignInsert = Omit<MarketingCampaign, 'id' | 'created_at' | 'updated_at' | 'spent'>
+export type MarketingCampaignUpdate = Partial<Omit<MarketingCampaign, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
+
+// ==================== Task Report ====================
