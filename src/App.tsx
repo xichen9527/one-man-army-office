@@ -84,7 +84,7 @@ function RedirectIfAuth({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <Router>
+    <Router basename="/one-man-army-office">
       <Routes>
         {/* 公开路由 - 已登录则跳转 */}
         <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Login /></Suspense></RedirectIfAuth>} />

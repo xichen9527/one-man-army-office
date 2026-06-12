@@ -219,30 +219,34 @@ export const useStore = create<AppState>((set, get) => ({
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         set({ currentUser: profile ? { ...profile, avatar: profile.avatar_url || undefined } : null, isAuthenticated: true, loading: false })
-        get().fetchProjects()
-        get().fetchTasks()
-        get().fetchDocuments()
-        get().fetchChannels()
-        get().fetchNotifications()
-        get().fetchCustomers()
-        get().fetchSalesOpportunities()
-        get().fetchSocialAccounts()
-        get().fetchSocialPosts()
-        get().fetchConferences()
-        get().fetchAIConversations()
-        get().fetchTeamMembers()
-        get().fetchInvitations()
-        get().fetchFiles()
-        get().fetchTrendingTopics()
-        // 登录后自动建立 realtime 订阅
-        get().subscribeToConferences()
-        get().subscribeToNotifications(session.user.id)
-        get().subscribeToProjects()
-        get().subscribeToTasks()
-        get().subscribeToDocuments()
-        get().subscribeToCRM()
-        get().subscribeToSchedules()
-        if (get().activeChannel) get().subscribeToMessages(get().activeChannel)
+        // 后台加载数据（catch 防止未处理的 promise rejection 导致数据为空）
+        Promise.all([
+          get().fetchProjects().catch(() => {}),
+          get().fetchTasks().catch(() => {}),
+          get().fetchDocuments().catch(() => {}),
+          get().fetchChannels().catch(() => {}),
+          get().fetchNotifications().catch(() => {}),
+          get().fetchCustomers().catch(() => {}),
+          get().fetchSalesOpportunities().catch(() => {}),
+          get().fetchSocialAccounts().catch(() => {}),
+          get().fetchSocialPosts().catch(() => {}),
+          get().fetchConferences().catch(() => {}),
+          get().fetchAIConversations().catch(() => {}),
+          get().fetchTeamMembers().catch(() => {}),
+          get().fetchInvitations().catch(() => {}),
+          get().fetchFiles().catch(() => {}),
+          get().fetchTrendingTopics().catch(() => {}),
+        ]).then(() => {
+          // 数据加载完成后建立 realtime 订阅
+          get().subscribeToConferences()
+          get().subscribeToNotifications(session.user.id)
+          get().subscribeToProjects()
+          get().subscribeToTasks()
+          get().subscribeToDocuments()
+          get().subscribeToCRM()
+          get().subscribeToSchedules()
+          if (get().activeChannel) get().subscribeToMessages(get().activeChannel)
+        })
       } else {
         set({ currentUser: null, isAuthenticated: false, loading: false })
       }
@@ -400,24 +404,18 @@ export const useStore = create<AppState>((set, get) => ({
     set({ projects: (data as Project[] | null) || [] })
   },
   addProject: async (p) => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
-      if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
-    } catch (e) {}
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
+    if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
   },
   updateProject: async (id, updates) => {
-    try {
-      const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
-      if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
-    } catch (e) {}
+    const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
+    if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
   },
   deleteProject: async (id) => {
-    try {
-      await supabase.from('projects').delete().eq('id', id)
-      set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
-    } catch (e) {}
+    await supabase.from('projects').delete().eq('id', id)
+    set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
   },
 
   // ========== Tasks ==========
@@ -431,24 +429,18 @@ export const useStore = create<AppState>((set, get) => ({
     set({ tasks: (data as Task[] | null) || [] })
   },
   addTask: async (t) => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
-      if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
-    } catch (e) {}
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
+    if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
   },
   updateTask: async (id, updates) => {
-    try {
-      const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
-      if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
-    } catch (e) {}
+    const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
+    if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
   },
   deleteTask: async (id) => {
-    try {
-      await supabase.from('tasks').delete().eq('id', id)
-      set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
-    } catch (e) {}
+    await supabase.from('tasks').delete().eq('id', id)
+    set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
   },
 
   // ========== Documents ==========
@@ -464,24 +456,18 @@ export const useStore = create<AppState>((set, get) => ({
     set({ documents: (data as Document[] | null) || [] })
   },
   addDocument: async (d) => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
-      if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
-    } catch (e) {}
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
+    if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
   },
   updateDocument: async (id, updates) => {
-    try {
-      const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
-      if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
-    } catch (e) {}
+    const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
+    if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
   },
   deleteDocument: async (id) => {
-    try {
-      await supabase.from('documents').delete().eq('id', id)
-      set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
-    } catch (e) {}
+    await supabase.from('documents').delete().eq('id', id)
+    set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
   },
 
   // ========== Messages & Channels ==========

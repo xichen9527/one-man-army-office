@@ -12,7 +12,7 @@
         var search = window.location.search;
         if (search.indexOf('?p=') === 0) {
           var path = decodeURIComponent(search.substring(3));
-          window.history.replaceState(null, null, path);
+          window.history.replaceState(null, null, '/one-man-army-office' + path);
         }
       })();
     </script>
