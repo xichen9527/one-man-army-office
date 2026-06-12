@@ -177,6 +177,16 @@ export default function VideoConference() {
     }
   }
 
+  const isValidUrl = (url: string): boolean => {
+    if (!url) return false
+    try {
+      const u = new URL(url)
+      return u.protocol === 'http:' || u.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+
   const handleStartMeeting = async (confId: string) => {
     clearFeedback()
     try {
@@ -187,7 +197,13 @@ export default function VideoConference() {
       setActiveMeeting(confId)
       setShowMeeting(true)
       const conf = conferences.find(c => c.id === confId)
-      if (conf?.join_url) window.open(conf.join_url, '_blank')
+      if (conf?.join_url) {
+        if (isValidUrl(conf.join_url)) {
+          window.open(conf.join_url, '_blank')
+        } else {
+          setActionError('会议链接无效，请检查会议配置')
+        }
+      }
     } catch (err: any) {
       setActionError('开始会议失败: ' + (err?.message || '请重试'))
     }
