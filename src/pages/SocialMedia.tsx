@@ -388,6 +388,12 @@ export default function SocialMedia() {
 
   const handleCreateAccount = () => {
     if (!af.account_name.trim()) return
+    // 从 localStorage 读取平台凭证，写入 metadata
+    let platformCreds: Record<string, string> = {}
+    try {
+      const tpCreds = JSON.parse(localStorage.getItem('third_party_credentials') || '{}')
+      platformCreds = (tpCreds[`social-${af.platform}`] as Record<string, string>) || {}
+    } catch {}
     addSocialAccount({
       platform: af.platform,
       account_name: af.account_name,
@@ -396,7 +402,7 @@ export default function SocialMedia() {
       status: 'active',
       check_status: 'pending',
       auto_sync: af.auto_sync,
-      user_id: currentUser.id,
+      metadata: platformCreds,
     })
     setShowNewAccount(false)
     setAf({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
