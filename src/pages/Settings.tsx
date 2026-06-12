@@ -1499,11 +1499,11 @@ function ThirdPartyServices() {
           body: JSON.stringify({ action: 'test', platform, credentials: form }),
           signal: AbortSignal.timeout(10000),
         })
-        if (resp.ok) {
-          setTestResult({ id: svc.id, ok: true, msg: `${svc.label}凭证验证通过 ✅` })
+        const data = await resp.json().catch(() => ({}))
+        if (resp.ok && data.ok !== false) {
+          setTestResult({ id: svc.id, ok: true, msg: data.msg || `${svc.label}凭证验证通过 ✅` })
         } else {
-          const err = await resp.json().catch(() => ({}))
-          setTestResult({ id: svc.id, ok: false, msg: `失败: ${err.error || err.detail || resp.statusText}` })
+          setTestResult({ id: svc.id, ok: false, msg: `失败: ${data.msg || data.error || data.detail || resp.statusText}` })
         }
       }
     } catch (e: any) {

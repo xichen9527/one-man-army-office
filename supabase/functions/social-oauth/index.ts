@@ -99,10 +99,66 @@ serve(async (req) => {
   const headers = corsHeaders()
   if (req.method === 'OPTIONS') return new Response('ok', { headers })
 
+
   try {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
     const platform = url.searchParams.get('platform') || url.searchParams.get('state')?.split(':')[0]
+
+    // ===== TEST: 验证凭证格式和可连接性 =====
+    if (req.method === 'POST') {
+      const body = await req.json() as Record<string, unknown>
+      if (body.action === 'test') {
+        const platformRaw = (body.platform as string) || ''
+        const platformKey = platformRaw.replace(/^social-/, '')
+        const credentials = (body.credentials as Record<string, string>) || {}
+        const cfg = PLATFORM_OAUTH[platformKey]
+        if (!cfg) {
+          return new Response(JSON.stringify({ ok: false, msg: '不支持的平台: ' + platformKey }),
+            { status: 400, headers: { 'Content-Type': 'application/json', ...headers } })
+        }
+        const clientId = credentials[cfg.clientIdField] || ''
+        const clientSecret = credentials[cfg.clientSecretField] || ''
+        if (!clientId || !clientSecret) {
+          return new Response(JSON.stringify({
+            ok: false,
+            msg: '缺少必填字段：' + cfg.clientIdField + ' 和 ' + cfg.clientSecretField,
+          }), { status: 400, headers: { 'Content-Type': 'application/json', ...headers } })
+        }
+        // 对每个平台测试 token 获取（不通过真实 code，用 client_credentials 模式试探）
+        const testParams: Record<string, string> = {
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'client_credentials',
+        }
+        if (cfg.extraTokenParams) Object.assign(testParams, cfg.extraTokenParams)
+        try {
+          const testResp = await fetch(cfg.tokenUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(testParams),
+            signal: AbortSignal.timeout(8000),
+          })
+          const testData = await testResp.json() as Record<string, unknown>
+          if (testResp.ok && !testData.error) {
+            return new Response(JSON.stringify({ ok: true, msg: cfg.name + ' 凭证验证通过 ✅' }),
+              { headers: { 'Content-Type': 'application/json', ...headers } })
+          }
+          // client_credentials 可能不支持，降级：用 authorization_code 流程但 fake code
+          // 直接检查返回的错误类型，区分「凭证错误」vs「其他错误」
+          if (testData.error && (testData.error === 'invalid_client' || testData.error === '10013')) {
+            return new Response(JSON.stringify({ ok: false, msg: 'App Key/Secret 无效，请检查填写是否正确' }),
+              { status: 400, headers: { 'Content-Type': 'application/json', ...headers } })
+          }
+          return new Response(JSON.stringify({ ok: false, msg: '验证失败：' + (testData.error_description || testData.msg || JSON.stringify(testData).slice(0, 100)) }),
+            { status: 400, headers: { 'Content-Type': 'application/json', ...headers } })
+        } catch (fetchErr: any) {
+          return new Response(JSON.stringify({ ok: false, msg: '网络错误：' + fetchErr.message }),
+            { status: 500, headers: { 'Content-Type': 'application/json', ...headers } })
+        }
+      }
+    }
+
 
     // ===== CALLBACK: OAuth 授权回调 =====
     if (code && platform) {
