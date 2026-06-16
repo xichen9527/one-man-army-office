@@ -4,7 +4,7 @@ import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
-  base: '/one-man-army-office/',
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
   css: {
     postcss: {
@@ -22,6 +22,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' https://jikjcdrrcywnwmtaabzh.supabase.co https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
+    },
   },
   build: {
     chunkSizeWarningLimit: 250,

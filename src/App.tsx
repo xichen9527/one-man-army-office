@@ -1,11 +1,10 @@
-﻿import React, { Suspense, lazy, useEffect } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from '@/store'
 import MainLayout from '@/components/layouts/MainLayout'
 
 // 懒加载页面
 const Login = lazy(() => import('@/pages/Login'))
-const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 const Register = lazy(() => import('@/pages/Register'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const AIAssistant = lazy(() => import('@/pages/AIAssistant'))
@@ -15,7 +14,6 @@ const CRM = lazy(() => import('@/pages/CRM'))
 const SocialMedia = lazy(() => import('@/pages/SocialMedia'))
 const VideoConference = lazy(() => import('@/pages/VideoConference'))
 const Settings = lazy(() => import('@/pages/Settings'))
-const AdminPage = lazy(() => import('@/pages/AdminPage'))
 // Projects merged into ProjectManagement
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'))
 const Invite = lazy(() => import('@/pages/Invite'))
@@ -84,11 +82,10 @@ function RedirectIfAuth({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <Router basename="/one-man-army-office">
+    <Router basename={import.meta.env.VITE_BASE_PATH?.replace(/\/$/, '') || undefined}>
       <Routes>
         {/* 公开路由 - 已登录则跳转 */}
         <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Login /></Suspense></RedirectIfAuth>} />
-        <Route path="/reset-password" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ResetPassword /></Suspense></RedirectIfAuth>} />
         <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Register /></Suspense></RedirectIfAuth>} />
         <Route path="/invite/:token" element={<Suspense fallback={<LoadingFallback />}><Invite /></Suspense>} />
 
@@ -101,10 +98,10 @@ export default function App() {
           <Route path="collaboration" element={<Suspense fallback={<LoadingFallback />}><Collaboration /></Suspense>} />
           <Route path="crm" element={<Suspense fallback={<LoadingFallback />}><CRM /></Suspense>} />
           <Route path="social-media" element={<Suspense fallback={<LoadingFallback />}><SocialMedia /></Suspense>} />
-            <Route path="projects/:id" element={<Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense>} />
+          // projects route merged into project-management
+          <Route path="projects/:id" element={<Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense>} />
           <Route path="video-conference" element={<Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<LoadingFallback />}><Settings /></Suspense>} />
-          <Route path="admin" element={<Suspense fallback={<LoadingFallback />}><AdminPage /></Suspense>} />
         </Route>
 
         {/* 404 */}

@@ -130,15 +130,8 @@ export default function Invite() {
         })
       }
 
-      // 4. 尝试自动登录（如果邮箱确认已关闭）
-      try {
-        await supabase.auth.signInWithPassword({ email, password })
-      } catch {
-        // 邮箱确认已开启，需要用户先验证邮箱
-        setError('注册成功！请检查邮箱并点击验证链接，然后登录。')
-        setTimeout(() => navigate('/login'), 5000)
-        return
-      }
+      // 4. 自动登录
+      await supabase.auth.signInWithPassword({ email, password })
 
       setStep('success')
       setTimeout(() => navigate('/dashboard'), 2500)

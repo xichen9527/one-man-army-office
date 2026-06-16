@@ -1,270 +1,46 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Bot, Eye, EyeOff, AlertCircle, Loader2, Shield, Mail, CheckCircle } from 'lucide-react'
+import { Bot, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
 import { useStore } from '@/store'
-import { supabase } from '@/db/supabase'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { signIn, verify2FA } = useStore()
-  const [identifier, setIdentifier] = useState('')
+  const { signIn } = useStore()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  
-  // Forgot password state
-  const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetLoading, setResetLoading] = useState(false)
-  const [resetSuccess, setResetSuccess] = useState(false)
-  const [resetError, setResetError] = useState('')
-
-  // 2FA state
-  const [show2FA, setShow2FA] = useState(false)
-  const [userId2FA, setUserId2FA] = useState<string | null>(null)
-  const [code2FA, setCode2FA] = useState(['', '', '', '', '', ''])
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!identifier || !password) {
-      setError('请输入账号和密码')
+    if (!email || !password) {
+      setError('请输入邮箱和密码')
       return
     }
     setLoading(true)
-    const result = await signIn(identifier, password, rememberMe)
+    const { error: err } = await signIn(email, password, rememberMe)
     setLoading(false)
-    
-    if (result.error) {
-      const msg = result.error.message || ''
-      if (msg.includes('锁定')) setError(msg)
-      else if (msg.includes('Invalid login credentials') || msg.includes('用户名或密码错误')) setError('用户名或密码错误')
+    if (err) {
+      const msg = err.message || ''
+      if (msg.includes('Invalid login credentials')) setError('邮箱或密码错误')
       else if (msg.includes('Email not confirmed')) setError('请先验证邮箱')
       else if (msg.includes('Too many requests')) setError('登录尝试次数过多，请稍后再试')
       else setError(msg || '登录失败，请重试')
-    } else if (result.requires2FA && result.userId) {
-      // Show 2FA verification UI
-      setShow2FA(true)
-      setUserId2FA(result.userId)
-      setCode2FA(['', '', '', '', '', ''])
-      // Focus first input
-      setTimeout(() => inputRefs.current[0]?.focus(), 100)
     } else {
       navigate('/dashboard')
     }
   }
 
-  const handle2FAChange = (index: number, value: string) => {
-    // Only allow digits
-    const digit = value.replace(/\D/g, '').slice(-1)
-    const newCode = [...code2FA]
-    newCode[index] = digit
-    setCode2FA(newCode)
-
-    // Auto-focus next input
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-
-    // Auto-submit when all 6 digits entered
-    if (index === 5 && digit) {
-      const fullCode = newCode.join('')
-      if (fullCode.length === 6) {
-        handle2FASubmit(fullCode)
-      }
-    }
-  }
-
-  const handle2FAKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !code2FA[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }
-
-  const handle2FASubmit = async (code?: string) => {
-    const fullCode = code || code2FA.join('')
-    if (fullCode.length !== 6) {
-      setError('请输入6位验证码')
-      return
-    }
-    if (!userId2FA) {
-      setError('登录会话已过期，请重新登录')
-      setShow2FA(false)
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    const { error: err } = await verify2FA(userId2FA, fullCode)
-    setLoading(false)
-
-    if (err) {
-      setError(err.message || '验证码错误')
-      setCode2FA(['', '', '', '', '', ''])
-      inputRefs.current[0]?.focus()
-    } else {
-      navigate('/dashboard')
-    }
-  }
-
-  const handleBackToLogin = () => {
-    setShow2FA(false)
-    setUserId2FA(null)
-    setCode2FA(['', '', '', '', '', ''])
-    setError('')
-  }
-
-  // 2FA Verification UI
-  if (show2FA) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              两步验证
-            </h1>
-            <p className="text-sm text-gray-500">请输入验证器应用中的6位验证码</p>
-          </div>
-
-          <Card className="border-0 shadow-xl">
-            <CardContent className="pt-6">
-              {error && (
-                <div className="flex items-center gap-2 p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="flex justify-center gap-2">
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <Input
-                      key={i}
-                      ref={(el) => { inputRefs.current[i] = el }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={code2FA[i]}
-                      onChange={(e) => handle2FAChange(i, e.target.value)}
-                      onKeyDown={(e) => handle2FAKeyDown(i, e)}
-                      className="w-12 h-14 text-center text-2xl font-semibold border-2 focus:border-blue-500"
-                      disabled={loading}
-                    />
-                  ))}
-                </div>
-
-                <Button
-                  onClick={() => handle2FASubmit()}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  disabled={loading || code2FA.some(c => !c)}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />验证中...</span>
-                  ) : '验证'}
-                </Button>
-
-                <button
-                  type="button"
-                  onClick={handleBackToLogin}
-                  className="w-full text-sm text-gray-500 hover:text-gray-700"
-                >
-                  返回登录
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  // Forgot Password Dialog
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!resetEmail.trim()) {
-      setResetError('请输入邮箱地址')
-      return
-    }
-    setResetLoading(true)
-    setResetError('')
-    try {
-      const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-        redirectTo: `${window.location.origin}/login`
-      })
-      if (err) {
-        setResetError(err.message || '发送失败，请重试')
-      } else {
-        setResetSuccess(true)
-      }
-    } catch {
-      setResetError('网络错误，请重试')
-    }
-    setResetLoading(false)
-  }
-
-  // Regular Login UI
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
-      {/* Forgot Password Modal */}
-      {showForgotPassword && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md border-0 shadow-xl">
-            <CardHeader className="space-y-1 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">重置密码</CardTitle>
-                  <CardDescription>输入您的邮箱，我们将发送重置链接</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {resetSuccess ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-4 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
-                    <CheckCircle className="h-5 w-5 shrink-0" />
-                    <span>重置链接已发送到 <strong>{resetEmail}</strong>，请查收邮件并按链接重置密码。</span>
-                  </div>
-                  <Button onClick={() => { setShowForgotPassword(false); setResetSuccess(false); setResetEmail('') }} className="w-full">返回登录</Button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  {resetError && (
-                    <div className="flex items-center gap-2 p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      {resetError}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email">邮箱地址</Label>
-                    <Input id="reset-email" type="email" placeholder="请输入注册邮箱" value={resetEmail} onChange={e => setResetEmail(e.target.value)} required />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={resetLoading}>
-                    {resetLoading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />发送中...</span> : '发送重置链接'}
-                  </Button>
-                  <button type="button" onClick={() => { setShowForgotPassword(false); setResetError(''); setResetEmail('') }} className="w-full text-sm text-gray-500 hover:text-gray-700">
-                    返回登录
-                  </button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center space-y-2">
@@ -292,8 +68,8 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="identifier">账号</Label>
-                <Input id="identifier" type="text" placeholder="用户名或邮箱" value={identifier} onChange={e => setIdentifier(e.target.value)} required autoComplete="username" />
+                <Label htmlFor="email">邮箱地址</Label>
+                <Input id="email" type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
               </div>
 
               <div className="space-y-2">
@@ -311,7 +87,7 @@ export default function Login() {
                   <Checkbox id="remember" checked={rememberMe} onCheckedChange={checked => setRememberMe(checked as boolean)} />
                   <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">记住我</Label>
                 </div>
-                <button type="button" onClick={() => { setShowForgotPassword(true); setError('') }} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <button type="button" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                   忘记密码？
                 </button>
               </div>

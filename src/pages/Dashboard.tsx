@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { startOfDay, isBefore, isSameDay, format, subDays, isToday, isTomorrow, isPast, parseISO, differenceInDays } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -73,14 +73,8 @@ type ProjectFilterKey = 'all' | 'active' | 'completed' | 'overdue' | 'draft' | '
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { currentUser, tasks, projects, customers, conferences, notifications, addTask, updateTask, taskReports, fetchTaskReports, addTaskReport, deleteTaskReport } = useStore()
+  const { currentUser, tasks, projects, customers, conferences, notifications, addTask, updateTask } = useStore()
   const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [activeTab, setActiveTab] = useState<'overview' | 'reports'>('overview')
-  const [showReportDialog, setShowReportDialog] = useState(false)
-  const [reportType, setReportType] = useState<'weekly' | 'monthly' | 'custom'>('weekly')
-  const [periodStart, setPeriodStart] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [periodEnd, setPeriodEnd] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [expandedReport, setExpandedReport] = useState<string | null>(null)
   const [taskFilter, setTaskFilter] = useState<'all' | 'overdue' | 'today' | 'in_progress'>('all')
   const [projectFilter, setProjectFilter] = useState<ProjectFilterKey>('all')
 
@@ -196,12 +190,6 @@ export default function Dashboard() {
     [conferences]
   )
 
-  useEffect(() => {
-    if (activeTab === 'reports') {
-      fetchTaskReports()
-    }
-  }, [activeTab])
-
   const handleQuickAddTask = () => {
     if (!newTaskTitle.trim()) return
     addTask({
@@ -241,39 +229,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Tab Switcher */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'overview' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          概览
-        </button>
-        <button
-          onClick={() => setActiveTab('reports')}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'reports' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          任务报告
-        </button>
+      {/* Welcome */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            欢迎回来，{currentUser?.full_name || '用户'} 👋
+          </h1>
+          <p className="text-gray-500 mt-1">{format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhCN })} · 让我们一起高效工作</p>
+        </div>
+        {weeklyStats.overdue > 0 && (
+          <Badge variant="destructive" className="w-fit">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            {weeklyStats.overdue} 个任务已逾期
+          </Badge>
+        )}
       </div>
-
-      {activeTab === 'overview' ? (
-        <>
-          {/* 原有欢迎区域 */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                欢迎回来，{currentUser?.full_name || '用户'} 👋
-              </h1>
-              <p className="text-gray-500 mt-1">{format(new Date(), 'yyyy年M月d日 EEEE', { locale: zhCN })} · 让我们一起高效工作</p>
-            </div>
-            {weeklyStats.overdue > 0 && (
-              <Badge variant="destructive" className="w-fit">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                {weeklyStats.overdue} 个任务已逾期
-              </Badge>
-            )}
-          </div>
 
       {/* 本周工作统计 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -566,111 +536,6 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
-        </>
-      ) : (
-        <div className="space-y-6">
-          {/* 报告头部 */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white rounded-lg border p-4">
-            <div className="flex gap-3 flex-wrap">
-              <select
-                value={reportType}
-                onChange={e => setReportType(e.target.value as any)}
-                className="text-sm border rounded-md px-2 py-1.5 bg-white"
-              >
-                <option value="weekly">周报</option>
-                <option value="monthly">月报</option>
-                <option value="custom">自定义</option>
-              </select>
-              <Input
-                type="date"
-                value={periodStart}
-                onChange={e => setPeriodStart(e.target.value)}
-                className="text-sm w-36"
-              />
-              <span className="text-gray-400 self-center">—</span>
-              <Input
-                type="date"
-                value={periodEnd}
-                onChange={e => setPeriodEnd(e.target.value)}
-                className="text-sm w-36"
-              />
-            </div>
-            <Button
-              onClick={async () => {
-                if (!currentUser) return
-                const total = tasks.length
-                const completed = tasks.filter(t => t.status === 'completed').length
-                const overdue = tasks.filter(t => t.status !== 'completed' && t.due_date && isPast(parseISO(t.due_date))).length
-                await addTaskReport({
-                  user_id: currentUser.id,
-                  project_id: null,
-                  title: `${reportType === 'weekly' ? '周' : reportType === 'monthly' ? '月' : ''}任务报告 ${periodStart} ~ ${periodEnd}`,
-                  report_type: reportType,
-                  start_date: periodStart,
-                  end_date: periodEnd,
-                  completion_rate: total > 0 ? Math.round((completed / total) * 100) : 0,
-                  summary: `周期内共 ${total} 个任务，完成 ${completed} 个，逾期 ${overdue} 个`,
-                  metadata: { total, completed, overdue },
-                })
-              }}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-1" /> 生成报告
-            </Button>
-          </div>
-
-          {/* 报告列表 */}
-          {taskReports.length === 0 ? (
-            <p className="text-center text-gray-400 py-12">暂无任务报告，点击上方「生成报告」开始</p>
-          ) : (
-            <div className="grid gap-4">
-              {taskReports.map(report => {
-                const rate = (report as any).completion_rate ?? 0
-                return (
-                  <Card key={report.id}>
-                    <CardContent className="p-4">
-                      <div
-                        className="flex items-start justify-between cursor-pointer"
-                        onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-gray-900">{report.title}</span>
-                            <Badge variant="secondary" className="text-xs">{report.report_type === 'weekly' ? '周报' : report.report_type === 'monthly' ? '月报' : '自定义'}</Badge>
-                          </div>
-                          <p className="text-xs text-gray-400">{(report as any).start_date} ~ {(report as any).end_date} · {format(parseISO(report.created_at), 'yyyy-MM-dd HH:mm')}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className={`text-sm font-bold ${rate >= 80 ? 'text-green-600' : rate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{rate}%</p>
-                            <p className="text-xs text-gray-400">完成率</p>
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteTaskReport(report.id) }}
-                            className="text-gray-300 hover:text-red-500 transition-colors"
-                          >✕</button>
-                        </div>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-100 rounded-full mt-2">
-                        <div
-                          className={`h-full rounded-full ${rate >= 80 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                          style={{ width: `${rate}%` }}
-                        />
-                      </div>
-                      {expandedReport === report.id && (
-                        <div className="mt-3 pt-3 border-t">
-                          <p className="text-sm text-gray-600">{(report as any).summary}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

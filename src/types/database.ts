@@ -1,4 +1,4 @@
-// 鐢?supabase gen types 鐢熸垚锛屾墜鍔ㄥ榻?schema.sql
+// 由 supabase gen types 生成，手动对齐 schema.sql
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export interface Database {
@@ -23,14 +23,6 @@ export interface Database {
       invitations: { Row: Invitation; Insert: InvitationInsert; Update: InvitationUpdate }
       files: { Row: DBFile; Insert: DBFileInsert; Update: DBFileUpdate }
       followups: { Row: Followup; Insert: FollowupInsert; Update: FollowupUpdate }
-      task_reports: { Row: TaskReport; Insert: TaskReportInsert; Update: TaskReportUpdate }
-      workspace_members: { Row: WorkspaceMember; Insert: WorkspaceMemberInsert; Update: WorkspaceMemberUpdate }
-      workspace_templates: { Row: WorkspaceTemplate; Insert: WorkspaceTemplateInsert; Update: WorkspaceTemplateUpdate }
-      content_templates: { Row: ContentTemplate; Insert: ContentTemplateInsert; Update: ContentTemplateUpdate }
-      automation_workflows: { Row: AutomationWorkflow; Insert: AutomationWorkflowInsert; Update: AutomationWorkflowUpdate }
-      marketing_campaigns: { Row: MarketingCampaign; Insert: MarketingCampaignInsert; Update: MarketingCampaignUpdate }
-      audit_logs: { Row: AuditLog; Insert: AuditLogInsert; Update: AuditLogUpdate }
-      user_roles: { Row: UserRole; Insert: UserRoleInsert; Update: UserRoleUpdate }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -49,8 +41,6 @@ export interface Profile {
   company: string | null
   bio: string | null
   settings: Json
-  two_factor_enabled: boolean
-  two_factor_secret: string | null
   created_at: string
   updated_at: string
 }
@@ -98,7 +88,7 @@ export interface Document {
   id: string
   title: string
   content: string | null
-  type: 'markdown' | 'richtext' | 'code' | 'word' | 'excel' | 'ppt' | 'mindmap' | 'flowchart' | 'other'
+  type: 'markdown' | 'richtext' | 'code'
   project_id: string | null
   task_id: string | null
   creator_id: string
@@ -204,7 +194,6 @@ export type FollowupUpdate = Partial<Omit<Followup, 'id' | 'user_id' | 'created_
 // ==================== CRM ====================
 export interface Customer {
   id: string
-  owner_id: string
   name: string
   email: string | null
   phone: string | null
@@ -221,11 +210,10 @@ export interface Customer {
   updated_at: string
 }
 export type CustomerInsert = Omit<Customer, 'id' | 'created_at' | 'updated_at'>
-export type CustomerUpdate = Partial<Omit<Customer, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
+export type CustomerUpdate = Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>
 
 export interface SalesOpportunity {
   id: string
-  owner_id: string
   customer_id: string
   title: string
   stage: 'initial' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
@@ -239,7 +227,7 @@ export interface SalesOpportunity {
   updated_at: string
 }
 export type SalesOpportunityInsert = Omit<SalesOpportunity, 'id' | 'created_at' | 'updated_at'>
-export type SalesOpportunityUpdate = Partial<Omit<SalesOpportunity, 'id' | 'owner_id' | 'customer_id' | 'created_at' | 'updated_at'>>
+export type SalesOpportunityUpdate = Partial<Omit<SalesOpportunity, 'id' | 'customer_id' | 'created_at' | 'updated_at'>>
 
 // ==================== Social ====================
 export interface SocialAccount {
@@ -368,275 +356,3 @@ export interface DBFile {
 }
 export type DBFileInsert = Omit<DBFile, 'id' | 'created_at'>
 export type DBFileUpdate = Partial<Omit<DBFile, 'id' | 'uploaded_by' | 'created_at'>>
-
-// ==================== Team Calendar ====================
-export interface Schedule {
-  id: string
-  user_id: string
-  title: string
-  description: string | null
-  event_type: 'event' | 'meeting' | 'deadline' | 'reminder' | 'holiday'
-  start_time: string
-  end_time: string | null
-  all_day: boolean
-  color: string
-  location: string | null
-  meeting_url: string | null
-  remind_before: number
-  created_at: string
-  updated_at: string
-}
-export type ScheduleInsert = Omit<Schedule, 'id' | 'created_at' | 'updated_at'>
-export type ScheduleUpdate = Partial<Omit<Schedule, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
-
-// ==================== Admin ====================
-export interface AuditLog {
-  id: string
-  user_id: string
-  action: string
-  resource_type: string | null
-  resource_id: string | null
-  details: Json
-  ip_address: string | null
-  created_at: string
-}
-
-export interface SystemConfig {
-  key: string
-  value: Json
-  description: string | null
-  updated_by: string | null
-  updated_at: string
-}
-
-export interface UserRole {
-  id: string
-  user_id: string
-  role: 'admin' | 'user' | 'viewer'
-  assigned_at: string
-}
-
-// ==================== Login Session ====================
-export interface LoginSession {
-  id: string
-  user_id: string
-  ip_address: string | null
-  user_agent: string | null
-  device_info: Json
-  login_method: 'email' | 'oauth' | '2fa'
-  is_current: boolean
-  expires_at: string | null
-  created_at: string
-  last_active_at: string
-}
-
-// ==================== File Version ====================
-export interface FileVersion {
-  id: string
-  file_id: string
-  version_number: number
-  storage_path: string
-  file_size: number | null
-  change_summary: string | null
-  created_by: string
-  created_at: string
-}
-
-// ==================== Customer Contact ====================
-export interface CustomerContact {
-  id: string
-  customer_id: string
-  name: string
-  title: string | null
-  email: string | null
-  phone: string | null
-  is_primary: boolean
-  notes: string | null
-  created_by: string
-  created_at: string
-  updated_at: string
-}
-
-// ==================== Project Milestone ====================
-export interface ProjectMilestone {
-  id: string
-  project_id: string
-  title: string
-  description: string | null
-  status: 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled'
-  due_date: string | null
-  completed_at: string | null
-  created_by: string
-  created_at: string
-  updated_at: string
-}
-
-// ==================== Tag ====================
-export interface Tag {
-  id: string
-  name: string
-  color: string
-  created_by: string
-  created_at: string
-}
-
-export interface TagAssociation {
-  id: string
-  tag_id: string
-  resource_type: 'project' | 'document' | 'customer' | 'social_post' | 'task'
-  resource_id: string
-  created_at: string
-}
-
-// ==================== Note ====================
-export interface Note {
-  id: string
-  user_id: string
-  title: string
-  content: string
-  color: string
-  is_pinned: boolean
-  is_archived: boolean
-  created_at: string
-  updated_at: string
-}
-
-// ==================== Task Reports ====================
-export interface TaskReport {
-  id: string
-  user_id: string
-  project_id: string | null
-  title: string
-  report_type: 'weekly' | 'monthly' | 'custom'
-  start_date: string
-  end_date: string
-  completion_rate: number
-  summary: string | null
-  metadata: Json
-  created_at: string
-}
-export type TaskReportInsert = Omit<TaskReport, 'id' | 'created_at'>
-export type TaskReportUpdate = Partial<Omit<TaskReport, 'id' | 'user_id' | 'created_at'>>
-
-// ==================== Workspace Members ====================
-export interface WorkspaceMember {
-  id: string
-  workspace_id: string
-  user_id: string
-  role: 'owner' | 'admin' | 'editor' | 'viewer'
-  joined_at: string
-  invited_by: string | null
-  full_name: string | null
-  email: string | null
-  metadata: Json
-}
-export type WorkspaceMemberInsert = Omit<WorkspaceMember, 'id' | 'joined_at'>
-export type WorkspaceMemberUpdate = Partial<Omit<WorkspaceMember, 'id' | 'workspace_id' | 'user_id' | 'joined_at'>>
-
-// ==================== Workspace Templates ====================
-export interface WorkspaceTemplate {
-  id: string
-  name: string
-  description: string | null
-  category: string | null
-  icon: string | null
-  structure: Json
-  usage_count: number
-  is_public: boolean
-  creator_id: string
-  metadata: Json
-  created_at: string
-  updated_at: string
-}
-export type WorkspaceTemplateInsert = Omit<WorkspaceTemplate, 'id' | 'created_at' | 'updated_at' | 'usage_count'>
-export type WorkspaceTemplateUpdate = Partial<Omit<WorkspaceTemplate, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
-
-// ==================== Content Templates ====================
-export interface ContentTemplate {
-  id: string
-  name: string
-  description: string | null
-  category: 'social' | 'email' | 'document' | 'presentation' | 'blog'
-  content: string
-  variables: string[] | null
-  creator_id: string
-  is_public: boolean
-  usage_count: number
-  metadata: Json
-  created_at: string
-  updated_at: string
-}
-export type ContentTemplateInsert = Omit<ContentTemplate, 'id' | 'created_at' | 'updated_at' | 'usage_count'>
-export type ContentTemplateUpdate = Partial<Omit<ContentTemplate, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
-
-// ==================== Automation Workflows ====================
-export interface AutomationWorkflow {
-  id: string
-  name: string
-  description: string | null
-  trigger_type: 'schedule' | 'event' | 'webhook'
-  trigger_config: Json
-  action_config: Json
-  is_active: boolean
-  last_run_at: string | null
-  run_count: number
-  creator_id: string
-  metadata: Json
-  created_at: string
-  updated_at: string
-}
-export type AutomationWorkflowInsert = Omit<AutomationWorkflow, 'id' | 'created_at' | 'updated_at' | 'run_count' | 'last_run_at'>
-export type AutomationWorkflowUpdate = Partial<Omit<AutomationWorkflow, 'id' | 'creator_id' | 'created_at' | 'updated_at'>>
-
-// ==================== Marketing Campaigns ====================
-export interface MarketingCampaign {
-  id: string
-  name: string
-  description: string | null
-  status: 'draft' | 'active' | 'paused' | 'completed'
-  budget: number | null
-  spent: number
-  start_date: string | null
-  end_date: string | null
-  target_audience: string | null
-  channels: string[] | null
-  owner_id: string
-  metadata: Json
-  created_at: string
-  updated_at: string
-}
-export type MarketingCampaignInsert = Omit<MarketingCampaign, 'id' | 'created_at' | 'updated_at' | 'spent'>
-export type MarketingCampaignUpdate = Partial<Omit<MarketingCampaign, 'id' | 'owner_id' | 'created_at' | 'updated_at'>>
-
-// ==================== Task Report ====================
-
-// ==================== Audit Log ====================
-export interface AuditLog {
-  id: string
-  user_id: string | null
-  action: string
-  resource_type: string
-  resource_id: string | null
-  details: any
-  ip_address: string | null
-  user_agent: string | null
-  created_at: string
-}
-
-export type AuditLogInsert = Omit<AuditLog, 'id' | 'created_at'>
-export type AuditLogUpdate = Partial<Omit<AuditLog, 'id' | 'created_at'>>
-
-// ==================== User Role ====================
-export interface UserRole {
-  id: string
-  user_id: string
-  role: 'admin' | 'manager' | 'user'
-  permissions: any
-  assigned_by: string | null
-  assigned_at: string
-  created_at: string
-  updated_at: string
-}
-
-export type UserRoleInsert = Omit<UserRole, 'id' | 'created_at' | 'updated_at'>
-export type UserRoleUpdate = Partial<Omit<UserRole, 'id' | 'created_at' | 'updated_at'>>

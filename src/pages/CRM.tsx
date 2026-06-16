@@ -10,8 +10,7 @@ import {
   Plus, Search, Trash2, Edit3, Phone, Mail, Building2, Tag,
   TrendingUp, DollarSign, Users, ArrowRight, ChevronRight,
   BarChart3, Target, X, Filter, Clock, MessageSquare, Video,
-  FileText, GripVertical, Check, StickyNote, Loader2,
-  Megaphone, Calendar, Settings as SettingsIcon, Trash2 as Trash2Icon
+  FileText, GripVertical, Check, StickyNote, Loader2
 } from 'lucide-react'
 import { useStore } from '@/store'
 import type { CustomerStatus, SalesStage, Followup } from '@/types/database'
@@ -244,131 +243,12 @@ function DraggableOppCard({
   )
 }
 
-// ========== Marketing Campaigns Tab ==========
-function MarketingCampaignsTab() {
-  const {
-    marketingCampaigns, fetchMarketingCampaigns,
-    addMarketingCampaign, updateMarketingCampaign, deleteMarketingCampaign,
-  } = useStore()
-  const [showDialog, setShowDialog] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [cName, setCName] = useState('')
-  const [cDesc, setCDesc] = useState('')
-  const [cBudget, setCBudget] = useState('')
-  const [cStart, setCStart] = useState('')
-  const [cEnd, setCEnd] = useState('')
-  const [cAudience, setCAudience] = useState('')
-  const [cChannel, setCChannel] = useState('')
-
-  useEffect(() => { fetchMarketingCampaigns() }, [])
-
-  const statusColor: Record<string, string> = { draft: 'bg-gray-100 text-gray-600', active: 'bg-green-100 text-green-700', paused: 'bg-yellow-100 text-yellow-700', completed: 'bg-blue-100 text-blue-700' }
-  const statusLabel: Record<string, string> = { draft: '草稿', active: '进行中', paused: '已暂停', completed: '已完成' }
-
-  const handleSave = async () => {
-    if (!cName.trim()) return
-    try {
-      const data = {
-        name: cName,
-        description: cDesc,
-        status: 'draft',
-        budget: parseFloat(cBudget) || 0,
-        spent: 0,
-        start_date: cStart || null,
-        end_date: cEnd || null,
-        target_audience: cAudience,
-        channels: cChannel,
-      }
-      if (editId) {
-        await updateMarketingCampaign(editId, data)
-      } else {
-        await addMarketingCampaign(data)
-      }
-      setShowDialog(false); setEditId(null); setCName(''); setCDesc(''); setCBudget(''); setCStart(''); setCEnd(''); setCAudience(''); setCChannel('')
-    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
-  }
-
-  const openEdit = (c: any) => {
-    setEditId(c.id); setCName(c.name); setCDesc(c.description || ''); setCBudget(String(c.budget || '')); setCStart(c.start_date || ''); setCEnd(c.end_date || ''); setCAudience(c.target_audience || ''); setCChannel(c.channels || ''); setShowDialog(true)
-  }
-
-  return (
-    <>
-      <div className="flex justify-end mb-4">
-        <Button size="sm" onClick={() => { setEditId(null); setCName(''); setCDesc(''); setCBudget(''); setCStart(''); setCEnd(''); setCAudience(''); setCChannel(''); setShowDialog(true) }}>
-          <Plus className="w-4 h-4 mr-1" /> 创建活动
-        </Button>
-      </div>
-      {marketingCampaigns.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">暂无营销活动，点击右上角创建</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {marketingCampaigns.map(c => (
-            <Card key={c.id}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{c.name}</p>
-                    <Badge className={`mt-1 text-xs ${statusColor[c.status] || statusColor.draft}`}>{statusLabel[c.status] || c.status}</Badge>
-                  </div>
-                  <div className="flex gap-1 ml-2">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Edit3 className="w-3.5 h-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { if (confirm('确认删除？')) { try { await deleteMarketingCampaign(c.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } } }}><Trash2Icon className="w-3.5 h-3.5 text-red-400" /></Button>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 line-clamp-2">{c.description || '—'}</p>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-600">
-                    <span>预算</span>
-                    <span className="font-medium">¥{(c.budget || 0).toLocaleString()} / ¥{(c.spent || 0).toLocaleString()} 已花</span>
-                  </div>
-                  {c.budget > 0 && (
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((c.spent / c.budget) * 100, 100)}%` }} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-gray-400">
-                  {c.start_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{c.start_date}</span>}
-                  {c.end_date && <span>~ {c.end_date}</span>}
-                </div>
-                {c.channels && <Badge variant="outline" className="text-xs">{c.channels}</Badge>}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editId ? '编辑活动' : '创建活动'}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><label className="text-sm font-medium">名称</label><Input value={cName} onChange={e => setCName(e.target.value)} placeholder="活动名称" /></div>
-            <div><label className="text-sm font-medium">描述</label><Input value={cDesc} onChange={e => setCDesc(e.target.value)} placeholder="可选描述" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium">预算</label><Input type="number" value={cBudget} onChange={e => setCBudget(e.target.value)} placeholder="预算金额" /></div>
-              <div><label className="text-sm font-medium">渠道</label><Input value={cChannel} onChange={e => setCChannel(e.target.value)} placeholder="如: 微信, 微博" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium">开始日期</label><Input type="date" value={cStart} onChange={e => setCStart(e.target.value)} /></div>
-              <div><label className="text-sm font-medium">结束日期</label><Input type="date" value={cEnd} onChange={e => setCEnd(e.target.value)} /></div>
-            </div>
-            <div><label className="text-sm font-medium">目标受众</label><Input value={cAudience} onChange={e => setCAudience(e.target.value)} placeholder="如: 25-35岁白领" /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleSave}>保存</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
 export default function CRM() {
   const {
     customers, salesOpportunities, currentUser,
     followups, fetchFollowups, addFollowup, deleteFollowup,
     addCustomer, updateCustomer, deleteCustomer,
     addOpportunity, updateOpportunity,
-    marketingCampaigns, fetchMarketingCampaigns,
-    addMarketingCampaign, updateMarketingCampaign, deleteMarketingCampaign,
   } = useStore()
 
   useEffect(() => {
@@ -536,7 +416,6 @@ export default function CRM() {
           <TabsTrigger value="customers" className="gap-1.5"><Users className="w-4 h-4" />客户列表</TabsTrigger>
           <TabsTrigger value="funnel" className="gap-1.5"><TrendingUp className="w-4 h-4" />销售漏斗</TabsTrigger>
           <TabsTrigger value="stats" className="gap-1.5"><BarChart3 className="w-4 h-4" />客户统计</TabsTrigger>
-          <TabsTrigger value="campaigns" className="gap-1.5"><Megaphone className="w-4 h-4" />营销活动</TabsTrigger>
         </TabsList>
 
         {/* ========== Customers ========== */}
@@ -850,7 +729,6 @@ export default function CRM() {
           </DndContext>
         </TabsContent>
 
-        <MarketingCampaignsTab />
         {/* ========== Stats ========== */}
         <TabsContent value="stats" className="mt-0">
           <div className="grid gap-4 md:grid-cols-4 mb-6">

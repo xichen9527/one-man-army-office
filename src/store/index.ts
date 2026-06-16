@@ -19,13 +19,6 @@ import type {
   TeamMember, TeamMemberInsert, TeamMemberUpdate,
   Invitation, InvitationInsert, InvitationUpdate,
   DBFile, DBFileInsert, DBFileUpdate,
-  Schedule, ScheduleInsert, ScheduleUpdate,
-  TaskReport, TaskReportInsert, TaskReportUpdate,
-  WorkspaceMember, WorkspaceMemberInsert, WorkspaceMemberUpdate,
-  WorkspaceTemplate, WorkspaceTemplateInsert, WorkspaceTemplateUpdate,
-  ContentTemplate, ContentTemplateInsert, ContentTemplateUpdate,
-  AutomationWorkflow, AutomationWorkflowInsert, AutomationWorkflowUpdate,
-  MarketingCampaign, MarketingCampaignInsert, MarketingCampaignUpdate,
 } from '@/types/database'
 
 // ==================== Store State ====================
@@ -36,8 +29,7 @@ interface AppState {
   loading: boolean
   loadUser: () => Promise<void>
   signUp: (email: string, password: string, fullName: string, username: string) => Promise<{ error: any }>
-  signIn: (email: string, password: string, remember?: boolean) => Promise<{ error: any; requires2FA?: boolean; userId?: string }>
-  verify2FA: (userId: string, code: string) => Promise<{ error: any }>
+  signIn: (email: string, password: string, remember?: boolean) => Promise<{ error: any }>
   signOut: () => Promise<void>
 
   // Projects
@@ -150,57 +142,6 @@ interface AppState {
   fetchFiles: (projectId?: string) => Promise<void>
   uploadFile: (file: File, projectId?: string, onProgress?: (pct: number) => void) => Promise<DBFile | null>
   deleteFile: (id: string) => Promise<void>
-
-  // Team Calendar
-  schedules: Schedule[]
-  fetchSchedules: () => Promise<void>
-  addSchedule: (s: Omit<ScheduleInsert, 'user_id'>) => Promise<void>
-  updateSchedule: (id: string, updates: ScheduleUpdate) => Promise<void>
-  deleteSchedule: (id: string) => Promise<void>
-
-  // Task Reports
-  taskReports: TaskReport[]
-  fetchTaskReports: (projectId?: string) => Promise<void>
-  addTaskReport: (r: Omit<TaskReportInsert, 'user_id'>) => Promise<void>
-  deleteTaskReport: (id: string) => Promise<void>
-
-  // Workspace Members
-  workspaceMembers: WorkspaceMember[]
-  fetchWorkspaceMembers: (workspaceId: string) => Promise<void>
-  addWorkspaceMember: (m: Omit<WorkspaceMemberInsert, 'workspace_id'>) => Promise<void>
-  updateWorkspaceMember: (id: string, updates: WorkspaceMemberUpdate) => Promise<void>
-  removeWorkspaceMember: (id: string) => Promise<void>
-
-  // Workspace Templates
-  workspaceTemplates: WorkspaceTemplate[]
-  fetchWorkspaceTemplates: () => Promise<void>
-  addWorkspaceTemplate: (t: Omit<WorkspaceTemplateInsert, 'creator_id'>) => Promise<void>
-  deleteWorkspaceTemplate: (id: string) => Promise<void>
-
-  // Content Templates
-  contentTemplates: ContentTemplate[]
-  fetchContentTemplates: (category?: string) => Promise<void>
-  addContentTemplate: (t: Omit<ContentTemplateInsert, 'creator_id'>) => Promise<void>
-  deleteContentTemplate: (id: string) => Promise<void>
-
-  // Automation Workflows
-  automationWorkflows: AutomationWorkflow[]
-  fetchAutomationWorkflows: () => Promise<void>
-  addAutomationWorkflow: (w: Omit<AutomationWorkflowInsert, 'creator_id'>) => Promise<void>
-  updateAutomationWorkflow: (id: string, updates: AutomationWorkflowUpdate) => Promise<void>
-  deleteAutomationWorkflow: (id: string) => Promise<void>
-  toggleAutomationWorkflow: (id: string, isActive: boolean) => Promise<void>
-
-  // Marketing Campaigns
-  marketingCampaigns: MarketingCampaign[]
-  fetchMarketingCampaigns: () => Promise<void>
-  addMarketingCampaign: (c: Omit<MarketingCampaignInsert, 'owner_id'>) => Promise<void>
-  updateMarketingCampaign: (id: string, updates: MarketingCampaignUpdate) => Promise<void>
-  deleteMarketingCampaign: (id: string) => Promise<void>
-
-  // Password Reset
-  resetPassword: (email: string) => Promise<{ error: any }>
-  updatePassword: (newPassword: string) => Promise<{ error: any }>
 }
 
 export type ConferenceStatus = Conference['status']
@@ -219,34 +160,25 @@ export const useStore = create<AppState>((set, get) => ({
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         set({ currentUser: profile ? { ...profile, avatar: profile.avatar_url || undefined } : null, isAuthenticated: true, loading: false })
-        // 后台加载数据（catch 防止未处理的 promise rejection 导致数据为空）
-        Promise.all([
-          get().fetchProjects().catch(() => {}),
-          get().fetchTasks().catch(() => {}),
-          get().fetchDocuments().catch(() => {}),
-          get().fetchChannels().catch(() => {}),
-          get().fetchNotifications().catch(() => {}),
-          get().fetchCustomers().catch(() => {}),
-          get().fetchSalesOpportunities().catch(() => {}),
-          get().fetchSocialAccounts().catch(() => {}),
-          get().fetchSocialPosts().catch(() => {}),
-          get().fetchConferences().catch(() => {}),
-          get().fetchAIConversations().catch(() => {}),
-          get().fetchTeamMembers().catch(() => {}),
-          get().fetchInvitations().catch(() => {}),
-          get().fetchFiles().catch(() => {}),
-          get().fetchTrendingTopics().catch(() => {}),
-        ]).then(() => {
-          // 数据加载完成后建立 realtime 订阅
-          get().subscribeToConferences()
-          get().subscribeToNotifications(session.user.id)
-          get().subscribeToProjects()
-          get().subscribeToTasks()
-          get().subscribeToDocuments()
-          get().subscribeToCRM()
-          get().subscribeToSchedules()
-          if (get().activeChannel) get().subscribeToMessages(get().activeChannel)
-        })
+        get().fetchProjects()
+        get().fetchTasks()
+        get().fetchDocuments()
+        get().fetchChannels()
+        get().fetchNotifications()
+        get().fetchCustomers()
+        get().fetchSalesOpportunities()
+        get().fetchSocialAccounts()
+        get().fetchSocialPosts()
+        get().fetchConferences()
+        get().fetchAIConversations()
+        get().fetchTeamMembers()
+        get().fetchInvitations()
+        get().fetchFiles()
+        get().fetchTrendingTopics()
+        // 登录后自动建立 realtime 订阅
+        get().subscribeToConferences()
+        get().subscribeToNotifications(session.user.id)
+        if (get().activeChannel) get().subscribeToMessages(get().activeChannel)
       } else {
         set({ currentUser: null, isAuthenticated: false, loading: false })
       }
@@ -261,123 +193,14 @@ export const useStore = create<AppState>((set, get) => ({
     return { error }
   },
 
-  signIn: async (email, password, _remember = false) => {
-    // Step 1: Authenticate with password
-    let userId: string | null = null
-    let session: any = null
-
-    // Try secure-login Edge Function first
-    try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/secure-login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ identifier: email, password }),
-      })
-      const data = await res.json()
-      if (data.locked) {
-        return { error: { message: data.error } }
-      }
-      if (data.error) {
-        return { error: { message: data.error } }
-      }
-      if (data.success && data.session) {
-        userId = data.session.user.id
-        session = data.session
-      }
-    } catch {
-      // Fallback: if Edge Function not deployed, use direct auth
-    }
-
-    // Fallback: direct Supabase auth
-    if (!userId) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) return { error }
-      userId = data.user.id
-      session = data.session
-    }
-
-    // Step 2: Check if 2FA is enabled for this user
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('two_factor_enabled, two_factor_secret')
-        .eq('id', userId)
-        .single()
-
-      if (profile?.two_factor_enabled && profile?.two_factor_secret) {
-        // 2FA is enabled - return requires2FA flag, don't set session yet
-        // Store session temporarily in memory for later use
-        ;(get() as any).__pendingSession = session
-        ;(get() as any).__pendingUserId = userId
-        return { error: null, requires2FA: true, userId }
-      }
-    } catch (e) {
-      // If we can't check, proceed without 2FA
-    }
-
-    // No 2FA - set session and load user
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    })
-    await get().loadUser()
-    return { error: null }
-  },
-
-  verify2FA: async (userId, code) => {
-    try {
-      // Get the pending session
-      const pendingSession = (get() as any).__pendingSession
-      const pendingUserId = (get() as any).__pendingUserId
-
-      if (!pendingSession || pendingUserId !== userId) {
-        return { error: { message: '登录会话已过期，请重新登录' } }
-      }
-
-      // Get user's 2FA secret
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('two_factor_secret')
-        .eq('id', userId)
-        .single()
-
-      if (profileError || !profile?.two_factor_secret) {
-        return { error: { message: '两步验证配置错误' } }
-      }
-
-      // Verify TOTP code
-      const { verifyTOTP } = await import('@/lib/totp')
-      const isValid = verifyTOTP(code, profile.two_factor_secret)
-
-      if (!isValid) {
-        return { error: { message: '验证码错误或已过期' } }
-      }
-
-      // Set session and load user
-      await supabase.auth.setSession({
-        access_token: pendingSession.access_token,
-        refresh_token: pendingSession.refresh_token,
-      })
-      await get().loadUser()
-
-      // Clear pending session
-      set({
-        __pendingSession: undefined,
-        __pendingUserId: undefined,
-      } as any)
-
-      return { error: null }
-    } catch (e) {
-      return { error: { message: '验证失败，请重试' } }
-    }
+  signIn: async (email, password, remember = false) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error) await get().loadUser()
+    return { error }
   },
 
   signOut: async () => {
     get().unsubscribeMessages()
-    get().unsubscribeData()
     set((s: any) => {
       if (s.__conferenceChannel) supabase.removeChannel(s.__conferenceChannel)
       if (s.__notificationChannel) supabase.removeChannel(s.__notificationChannel)
@@ -389,85 +212,105 @@ export const useStore = create<AppState>((set, get) => ({
       projects: [], tasks: [], documents: [], channels: [], messages: {},
       notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [],
       conferences: [], customers: [], salesOpportunities: [], members: [], invitations: [], files: [],
-      schedules: [],
     })
   },
 
   // ========== Projects ==========
   projects: [],
   fetchProjects: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('projects')
-      .select('*').eq('owner_id', user.user.id)
-      .order('created_at', { ascending: false })
-    set({ projects: (data as Project[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('projects').select('*').eq('owner_id', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchProjects failed:', error); return }
+      set({ projects: (data as Project[] | null) || [] })
+    } catch (e) { console.error('fetchProjects failed:', e) }
   },
   addProject: async (p) => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
-    if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
+      if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
+    } catch (e) { console.error('addProject failed:', e) }
   },
   updateProject: async (id, updates) => {
-    const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
-    if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
+    try {
+      const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
+      if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
+    } catch (e) { console.error('updateProject failed:', e) }
   },
   deleteProject: async (id) => {
-    await supabase.from('projects').delete().eq('id', id)
-    set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
+    try {
+      await supabase.from('projects').delete().eq('id', id)
+      set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
+    } catch (e) { console.error('deleteProject failed:', e) }
   },
 
   // ========== Tasks ==========
   tasks: [],
   fetchTasks: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('tasks')
-      .select('*').eq('creator_id', user.user.id)
-      .order('created_at', { ascending: false })
-    set({ tasks: (data as Task[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('tasks').select('*').eq('creator_id', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchTasks failed:', error); return }
+      set({ tasks: (data as Task[] | null) || [] })
+    } catch (e) { console.error('fetchTasks failed:', e) }
   },
   addTask: async (t) => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
-    if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
+      if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
+    } catch (e) { console.error('addTask failed:', e) }
   },
   updateTask: async (id, updates) => {
-    const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
-    if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
+    try {
+      const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
+      if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
+    } catch (e) { console.error('updateTask failed:', e) }
   },
   deleteTask: async (id) => {
-    await supabase.from('tasks').delete().eq('id', id)
-    set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
+    try {
+      await supabase.from('tasks').delete().eq('id', id)
+      set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
+    } catch (e) { console.error('deleteTask failed:', e) }
   },
 
   // ========== Documents ==========
   documents: [],
   fetchDocuments: async (projectId) => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    let query = supabase.from('documents')
-      .select('*').eq('creator_id', user.user.id)
-      .order('updated_at', { ascending: false })
-    if (projectId) query = query.eq('project_id', projectId)
-    const { data } = await query
-    set({ documents: (data as Document[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      let query = supabase.from('documents').select('*').or(`creator_id.eq.${user.user.id},owner_id.eq.${user.user.id}`).order('updated_at', { ascending: false })
+      if (projectId) query = query.eq('project_id', projectId)
+      const { data, error } = await query
+      if (error) { console.error('fetchDocuments failed:', error); return }
+      set({ documents: (data as Document[] | null) || [] })
+    } catch (e) { console.error('fetchDocuments failed:', e) }
   },
   addDocument: async (d) => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
-    if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
+      if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
+    } catch (e) { console.error('addDocument failed:', e) }
   },
   updateDocument: async (id, updates) => {
-    const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
-    if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
+    try {
+      const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
+      if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
+    } catch (e) { console.error('updateDocument failed:', e) }
   },
   deleteDocument: async (id) => {
-    await supabase.from('documents').delete().eq('id', id)
-    set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
+    try {
+      await supabase.from('documents').delete().eq('id', id)
+      set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
+    } catch (e) { console.error('deleteDocument failed:', e) }
   },
 
   // ========== Messages & Channels ==========
@@ -478,16 +321,15 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data } = await supabase.from('channels')
-        .select('*').eq('created_by', user.user.id)
-        .order('created_at')
+      const { data, error } = await supabase.from('channels').select('*').or(`owner_id.eq.${user.user.id},is_public.eq.true`).order('created_at')
+      if (error) { console.error('fetchChannels failed:', error); return }
       set({ channels: (data as Channel[] | null) || [] })
       const state = get()
       if (data && data.length > 0 && !state.activeChannel) {
         set({ activeChannel: data[0].id })
         get().fetchMessages(data[0].id)
       }
-    } catch (e) {}
+    } catch (e) { console.error('fetchChannels failed:', e) }
   },
   createChannel: async (name, description, isPrivate) => {
     try {
@@ -497,13 +339,13 @@ export const useStore = create<AppState>((set, get) => ({
         name, description, is_private: isPrivate, created_by: user.user.id,
       } as ChannelInsert).select().single()
       if (data) set((s) => ({ channels: [...s.channels, data as Channel] }))
-    } catch (e) {}
+    } catch (e) { console.error('createChannel failed:', e) }
   },
   updateChannel: async (id, updates) => {
     try {
       const { data } = await supabase.from('channels').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ channels: s.channels.map((c: Channel) => c.id === id ? data as Channel : c) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateChannel failed:', e) }
   },
   deleteChannel: async (id) => {
     try {
@@ -518,13 +360,14 @@ export const useStore = create<AppState>((set, get) => ({
           activeChannel: s.activeChannel === id ? (remaining[0]?.id || null) : s.activeChannel
         }
       })
-    } catch (e) {}
+    } catch (e) { console.error('deleteChannel failed:', e) }
   },
   fetchMessages: async (channelId) => {
     try {
-      const { data } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
+      const { data, error } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
+      if (error) { console.error('fetchMessages failed:', error); return }
       set((s) => ({ messages: { ...s.messages, [channelId]: (data as Message[] | null) || [] } }))
-    } catch (e) {}
+    } catch (e) { console.error('fetchMessages failed:', e) }
   },
   setActiveChannel: (id) => {
     set({ activeChannel: id })
@@ -540,26 +383,26 @@ export const useStore = create<AppState>((set, get) => ({
       const { data } = await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content, message_type: 'text', reply_to: replyTo,
       } as any).select().single()
-    } catch (e) {throw e }
+    } catch (e) { console.error('sendMessage failed:', e); throw e }
   },
   sendFileMessage: async (channelId, fileUrl, fileName, senderId, senderName, replyTo = null) => {
     try {
       await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content: fileName, message_type: 'file', file_url: fileUrl, file_name: fileName, reply_to: replyTo,
       } as any).select().single()
-    } catch (e) {throw e }
+    } catch (e) { console.error('sendFileMessage failed:', e); throw e }
   },
   updateMessage: async (id, channelId, updates) => {
     try {
       const { data } = await supabase.from('messages').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).map((m: Message) => m.id === id ? data as Message : m) } }))
-    } catch (e) {throw e }
+    } catch (e) { console.error('updateMessage failed:', e); throw e }
   },
   deleteMessage: async (id, channelId) => {
     try {
       await supabase.from('messages').delete().eq('id', id)
       set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).filter((m: Message) => m.id !== id) } }))
-    } catch (e) {throw e }
+    } catch (e) { console.error('deleteMessage failed:', e); throw e }
   },
   addNotification: async (userId, title, content, type) => {
     try {
@@ -567,18 +410,19 @@ export const useStore = create<AppState>((set, get) => ({
         user_id: userId, title, content, type, read: false,
       } as any).select().single()
       if (data) set((s) => ({ notifications: [data as Notification, ...s.notifications] }))
-    } catch (e) {}
+    } catch (e) { console.error('addNotification failed:', e) }
   },
 
   // ========== Team ==========
   members: [],
   invitations: [],
   fetchTeamMembers: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data: members } = await supabase.from('team_members').select('user_id, role, status, joined_at').eq('owner_id', user.user.id)
-    if (!members) return
-    const userIds = members.map((m: any) => m.user_id).filter(Boolean)
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data: members } = await supabase.from('team_members').select('user_id, role, status, joined_at').eq('owner_id', user.user.id)
+      if (!members) return
+      const userIds = members.map((m: any) => m.user_id).filter(Boolean)
     let profiles: Record<string, any> = {}
     if (userIds.length > 0) {
       const { data: profileData } = await supabase.from('profiles').select('id, full_name, username, email').in('id', userIds)
@@ -593,12 +437,16 @@ export const useStore = create<AppState>((set, get) => ({
       invited_at: m.invited_at || new Date().toISOString(),
     }))
     set({ members: enriched })
+    } catch (e) { console.error('fetchTeamMembers failed:', e) }
   },
   fetchInvitations: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('invitations').select('*').eq('team_owner_id', user.user.id)
-    set({ invitations: (data as Invitation[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('invitations').select('*').eq('team_owner_id', user.user.id)
+      if (error) { console.error('fetchInvitations failed:', error); return }
+      set({ invitations: (data as Invitation[] | null) || [] })
+    } catch (e) { console.error('fetchInvitations failed:', e) }
   },
   addMember: async (email, role) => {
     try {
@@ -621,75 +469,118 @@ export const useStore = create<AppState>((set, get) => ({
               token,
             }),
           })
-        } catch (e) {}
+        } catch (e) { console.warn('发送邀请邮件失败:', e) }
       }
-    } catch (e) {}
+    } catch (e) { console.error('addMember failed:', e) }
   },
   removeMember: async (id) => {
     try {
       await supabase.from('team_members').delete().eq('id', id)
       set((s) => ({ members: s.members.filter((m: TeamMember) => m.id !== id) }))
-    } catch (e) {}
+    } catch (e) { console.error('removeMember failed:', e) }
   },
   updateMember: async (id, updates) => {
     try {
       const { data } = await supabase.from('team_members').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ members: s.members.map((m: TeamMember) => m.id === id ? data as TeamMember : m) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateMember failed:', e) }
   },
 
   // ========== CRM ==========
   customers: [],
   fetchCustomers: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('customers')
-      .select('*').eq('owner_id', user.user.id)
-      .order('created_at', { ascending: false })
-    set({ customers: (data as Customer[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('customers').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchCustomers failed:', error); return }
+      set({ customers: (data as Customer[] | null) || [] })
+    } catch (e) { console.error('fetchCustomers failed:', e) }
   },
   addCustomer: async (c) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data } = await supabase.from('customers').insert({ ...c, owner_id: user.user.id } as any).select().single()
+      const { data, error } = await supabase.from('customers').insert({ ...c, assigned_to: user.user.id } as any).select().single()
+      if (error) { console.error('addCustomer failed:', error); return }
       if (data) set((s) => ({ customers: [data as Customer, ...s.customers] }))
-    } catch (e) {}
+    } catch (e) { console.error('addCustomer failed:', e) }
   },
   updateCustomer: async (id, updates) => {
     try {
-      const { data } = await supabase.from('customers').update(updates as any).eq('id', id).select().single()
+      const { data, error } = await supabase.from('customers').update(updates as any).eq('id', id).select().single()
+      if (error) { console.error('updateCustomer failed:', error); return }
       if (data) set((s) => ({ customers: s.customers.map((c: Customer) => c.id === id ? data as Customer : c) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateCustomer failed:', e) }
   },
   deleteCustomer: async (id) => {
     try {
-      await supabase.from('customers').delete().eq('id', id)
+      const { error } = await supabase.from('customers').delete().eq('id', id)
+      if (error) { console.error('deleteCustomer failed:', error); return }
       set((s) => ({ customers: s.customers.filter((c: Customer) => c.id !== id) }))
-    } catch (e) {}
+    } catch (e) { console.error('deleteCustomer failed:', e) }
   },
   salesOpportunities: [],
   fetchSalesOpportunities: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('sales_opportunities')
-      .select('*').eq('owner_id', user.user.id)
-      .order('created_at', { ascending: false })
-    set({ salesOpportunities: (data as SalesOpportunity[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('sales_opportunities').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchSalesOpportunities failed:', error); return }
+      set({ salesOpportunities: (data as SalesOpportunity[] | null) || [] })
+    } catch (e) { console.error('fetchSalesOpportunities failed:', e) }
   },
   addOpportunity: async (o) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data } = await supabase.from('sales_opportunities').insert({ ...o, owner_id: user.user.id } as any).select().single()
+      const { data, error } = await supabase.from('sales_opportunities').insert({ ...o, assigned_to: user.user.id } as any).select().single()
+      if (error) { console.error('addOpportunity failed:', error); return }
       if (data) set((s) => ({ salesOpportunities: [data as SalesOpportunity, ...s.salesOpportunities] }))
-    } catch (e) {}
+    } catch (e) { console.error('addOpportunity failed:', e) }
   },
   updateOpportunity: async (id, updates) => {
     try {
-      const { data } = await supabase.from('sales_opportunities').update(updates as any).eq('id', id).select().single()
+      const { data, error } = await supabase.from('sales_opportunities').update(updates as any).eq('id', id).select().single()
+      if (error) { console.error('updateOpportunity failed:', error); return }
       if (data) set((s) => ({ salesOpportunities: s.salesOpportunities.map((o: SalesOpportunity) => o.id === id ? data as SalesOpportunity : o) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateOpportunity failed:', e) }
+  },
+  deleteOpportunity: async (id) => {
+    try {
+      const { error } = await supabase.from('sales_opportunities').delete().eq('id', id)
+      if (error) { console.error('deleteOpportunity failed:', error); return }
+      set((s) => ({ salesOpportunities: s.salesOpportunities.filter((o: SalesOpportunity) => o.id !== id) }))
+    } catch (e) { console.error('deleteOpportunity failed:', e) }
+  },
+
+  // ========== Followups ==========
+  followups: {},
+  fetchFollowups: async (customerId: string) => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('followups').select('*').eq('customer_id', customerId).eq('user_id', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchFollowups failed:', error); return }
+      set((s) => ({ followups: { ...s.followups, [customerId]: (data as Followup[] | null) || [] } }))
+    } catch (e) { console.error('fetchFollowups failed:', e) }
+  },
+  addFollowup: async (data: FollowupInsert) => {
+    try {
+      const { data: result, error } = await supabase.from('followups').insert(data as any).select().single()
+      if (error) { console.error('addFollowup failed:', error); return }
+      if (result) {
+        const customerId = result.customer_id
+        set((s) => ({ followups: { ...s.followups, [customerId]: [result as Followup, ...(s.followups[customerId] || [])] } }))
+      }
+    } catch (e) { console.error('addFollowup failed:', e) }
+  },
+  deleteFollowup: async (id: string, customerId: string) => {
+    try {
+      const { error } = await supabase.from('followups').delete().eq('id', id)
+      if (error) { console.error('deleteFollowup failed:', error); return }
+      set((s) => ({ followups: { ...s.followups, [customerId]: (s.followups[customerId] || []).filter((f: Followup) => f.id !== id) } }))
+    } catch (e) { console.error('deleteFollowup failed:', e) }
   },
 
   // ========== AI ==========
@@ -697,18 +588,20 @@ export const useStore = create<AppState>((set, get) => ({
   aiMessages: {},
   activeAIConv: null,
   fetchAIConversations: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('ai_conversations')
-      .select('*').eq('user_id', user.user.id)
-      .order('updated_at', { ascending: false })
-    set({ aiConversations: (data as AIConversation[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('ai_conversations').select('*').eq('user_id', user.user.id).order('updated_at', { ascending: false })
+      if (error) { console.error('fetchAIConversations failed:', error); return }
+      set({ aiConversations: (data as AIConversation[] | null) || [] })
+    } catch (e) { console.error('fetchAIConversations failed:', e) }
   },
   fetchAIMessages: async (convId) => {
     try {
-      const { data } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
+      const { data, error } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
+      if (error) { console.error('fetchAIMessages failed:', error); return }
       set((s) => ({ aiMessages: { ...s.aiMessages, [convId]: (data as AIMessage[] | null) || [] } }))
-    } catch (e) {}
+    } catch (e) { console.error('fetchAIMessages failed:', e) }
   },
   setActiveAIConv: (id) => set({ activeAIConv: id }),
   createAIConv: async (title, featureType) => {
@@ -723,69 +616,18 @@ export const useStore = create<AppState>((set, get) => ({
         return data.id
       }
       return ''
-    } catch (e) {return '' }
+    } catch (e) { console.error('createAIConv failed:', e); return '' }
   },
   sendAIMessage: async (convId, content) => {
     const { data: user } = await supabase.auth.getUser()
     if (!user.user) throw new Error('请先登录')
     
-    // 获取对话的 feature_type，判断是否走 AI 搜索
-    const conv = (getState().aiConversations as AIConversation[]).find(c => c.id === convId)
-    const isAISearch = conv?.feature_type === 'ai_search'
-
     // 插入用户消息
     const { data: userMsg, error: userMsgError } = await supabase.from('ai_messages').insert({
       conversation_id: convId, role: 'user', content,
     } as any).select().single()
     if (userMsgError || !userMsg) throw new Error('发送用户消息失败: ' + (userMsgError?.message || '未知错误'))
 
-    // AI 搜索专属路径
-    if (isAISearch) {
-      const { data: aiMsgPlaceholder, error: placeholderError } = await supabase.from('ai_messages').insert({
-        conversation_id: convId, role: 'assistant', content: '🔍 正在搜索...', model: 'ai-search',
-      } as any).select().single()
-      if (placeholderError || !aiMsgPlaceholder) throw new Error('创建 AI 消息失败')
-
-      set((s) => ({
-        aiMessages: { ...s.aiMessages, [convId]: [...(s.aiMessages[convId] || []), userMsg, aiMsgPlaceholder] },
-        aiConversations: s.aiConversations.map((c: AIConversation) => c.id === convId ? { ...c, updated_at: new Date().toISOString() } : c),
-      }))
-
-      try {
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ query: content }),
-        })
-        const data = await res.json()
-        let searchContent = ''
-        if (data.results && data.results.length > 0) {
-          searchContent = '## 🔍 搜索结果：' + content + '\n\n'
-          data.results.forEach((r: any, i: number) => {
-            searchContent += `${i + 1}. **[${r.title}](${r.link})**\n   ${r.snippet || ''}\n\n`
-          })
-        } else {
-          searchContent = '抱歉，暂未找到相关结果。请尝试更换关键词。'
-        }
-        await supabase.from('ai_messages').update({ content: searchContent } as any).eq('id', aiMsgPlaceholder.id)
-        set((s) => ({
-          aiMessages: { ...s.aiMessages, [convId]: (s.aiMessages[convId] || []).map(m => m.id === aiMsgPlaceholder.id ? { ...m, content: searchContent } : m) },
-        }))
-      } catch (e: any) {
-        const errMsg = '搜索服务暂不可用：' + (e.message || '未知错误')
-        await supabase.from('ai_messages').update({ content: errMsg } as any).eq('id', aiMsgPlaceholder.id)
-        set((s) => ({
-          aiMessages: { ...s.aiMessages, [convId]: (s.aiMessages[convId] || []).map(m => m.id === aiMsgPlaceholder.id ? { ...m, content: errMsg } : m) },
-        }))
-      }
-      return
-    }
-    
-    // 非 AI 搜索：标准流式对话（原有逻辑）
     // 先添加一个空的 AI 消息占位符（用于流式更新）
     const { data: aiMsgPlaceholder, error: placeholderError } = await supabase.from('ai_messages').insert({
       conversation_id: convId, role: 'assistant', content: '', model: 'streaming...',
@@ -873,6 +715,7 @@ export const useStore = create<AppState>((set, get) => ({
         )
         streamOk = true
       } catch (e: any) {
+        console.warn('自定义 API 流式调用失败，尝试系统 API:', e.message)
       }
     }
 
@@ -892,6 +735,7 @@ export const useStore = create<AppState>((set, get) => ({
         modelName = 'system-default'
         streamOk = true
       } catch (e: any) {
+        console.warn('Edge Function 流式调用失败:', e.message)
       }
     }
 
@@ -925,7 +769,9 @@ export const useStore = create<AppState>((set, get) => ({
     const { data: aiMsgFinal, error: aiMsgError } = await supabase.from('ai_messages').update({
       content: aiContent, model: modelName,
     } as any).eq('id', aiMsgPlaceholder.id).select().single()
-    if (aiMsgError)// 更新本地状态为最终内容
+    if (aiMsgError) console.error('更新 AI 消息失败:', aiMsgError)
+
+    // 更新本地状态为最终内容
     set((s) => ({
       aiMessages: {
         ...s.aiMessages,
@@ -953,53 +799,34 @@ export const useStore = create<AppState>((set, get) => ({
     }))
   },
 
-  // ========== CRM Followups ==========
-  followups: {},
-  fetchFollowups: async (customerId) => {
-    try {
-      const { data } = await supabase.from('followups').select('*').eq('customer_id', customerId).order('created_at', { ascending: false })
-      set((s) => ({ followups: { ...s.followups, [customerId]: (data as Followup[] | null) || [] } }))
-    } catch (e) {}
-  },
-  addFollowup: async (data) => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      const { data: fol } = await supabase.from('followups').insert({ ...data, user_id: user?.id || '' }).select().single()
-      if (fol) set((s) => ({ followups: { ...s.followups, [fol.customer_id]: [fol as Followup, ...(s.followups[fol.customer_id] || [])] } }))
-    } catch (e) {}
-  },
-  deleteFollowup: async (id, customerId) => {
-    try {
-      await supabase.from('followups').delete().eq('id', id)
-      set((s) => ({ followups: { ...s.followups, [customerId]: (s.followups[customerId] || []).filter((f: Followup) => f.id !== id) } }))
-    } catch (e) {}
-  },
-
   // ========== Social Media ==========
   socialAccounts: [],
   socialPosts: [],
   trendingTopics: [],
   fetchSocialAccounts: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('social_accounts')
-      .select('*').eq('user_id', user.user.id)
-      .order('created_at')
-    set({ socialAccounts: (data as SocialAccount[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('social_accounts').select('*').eq('user_id', user.user.id).order('created_at')
+      if (error) { console.error('fetchSocialAccounts failed:', error); return }
+      set({ socialAccounts: (data as SocialAccount[] | null) || [] })
+    } catch (e) { console.error('fetchSocialAccounts failed:', e) }
   },
   fetchSocialPosts: async (accountId) => {
     try {
       let query = supabase.from('social_posts').select('*').order('created_at', { ascending: false })
       if (accountId) query = query.eq('account_id', accountId)
-      const { data } = await query
+      const { data, error } = await query
+      if (error) { console.error('fetchSocialPosts failed:', error); return }
       set({ socialPosts: (data as SocialPost[] | null) || [] })
-    } catch (e) {}
+    } catch (e) { console.error('fetchSocialPosts failed:', e) }
   },
   fetchTrendingTopics: async () => {
     try {
-      const { data } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
+      const { data, error } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
+      if (error) { console.error('fetchTrendingTopics failed:', error); return }
       set({ trendingTopics: (data as TrendingTopic[] | null) || [] })
-    } catch (e) {}
+    } catch (e) { console.error('fetchTrendingTopics failed:', e) }
   },
   addSocialAccount: async (a) => {
     try {
@@ -1007,19 +834,19 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       const { data } = await supabase.from('social_accounts').insert({ ...a, user_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ socialAccounts: [data as SocialAccount, ...s.socialAccounts] }))
-    } catch (e) {}
+    } catch (e) { console.error('addSocialAccount failed:', e) }
   },
   updateSocialAccount: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_accounts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialAccounts: s.socialAccounts.map((a: SocialAccount) => a.id === id ? data as SocialAccount : a) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateSocialAccount failed:', e) }
   },
   deleteSocialAccount: async (id) => {
     try {
       await supabase.from('social_accounts').delete().eq('id', id)
       set((s) => ({ socialAccounts: s.socialAccounts.filter((a: SocialAccount) => a.id !== id) }))
-    } catch (e) {}
+    } catch (e) { console.error('deleteSocialAccount failed:', e) }
   },
   syncSocialAccount: async (id, credentials) => {
     const account = get().socialAccounts.find((a: SocialAccount) => a.id === id)
@@ -1049,25 +876,26 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return json
     } catch (e) {
+      console.warn('同步失败:', e)
     }
   },
   addSocialPost: async (p) => {
     try {
       const { data } = await supabase.from('social_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
-    } catch (e) {}
+    } catch (e) { console.error('addSocialPost failed:', e) }
   },
   updateSocialPost: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_posts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialPosts: s.socialPosts.map((p: SocialPost) => p.id === id ? data as SocialPost : p) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateSocialPost failed:', e) }
   },
   deleteSocialPost: async (id) => {
     try {
       await supabase.from('social_posts').delete().eq('id', id)
       set((s) => ({ socialPosts: s.socialPosts.filter((p: SocialPost) => p.id !== id) }))
-    } catch (e) {}
+    } catch (e) { console.error('deleteSocialPost failed:', e) }
   },
 
   // Open OAuth authorization window for a platform account
@@ -1131,12 +959,13 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Video Conference ==========
   conferences: [],
   fetchConferences: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('video_conferences')
-      .select('*').eq('host_id', user.user.id)
-      .order('created_at', { ascending: false })
-    set({ conferences: (data as Conference[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('video_conferences').select('*').eq('host_id', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchConferences failed:', error); return }
+      set({ conferences: (data as Conference[] | null) || [] })
+    } catch (e) { console.error('fetchConferences failed:', e) }
   },
   addConference: async (c) => {
     try {
@@ -1147,34 +976,37 @@ export const useStore = create<AppState>((set, get) => ({
         ...c, host_id: user.user.id, meeting_id: meetingId,
       } as any).select().single()
       if (data) set((s) => ({ conferences: [data as Conference, ...s.conferences] }))
-    } catch (e) {}
+    } catch (e) { console.error('addConference failed:', e) }
   },
   updateConference: async (id, updates) => {
     try {
       const { data } = await supabase.from('video_conferences').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ conferences: s.conferences.map((c: Conference) => c.id === id ? data as Conference : c) }))
-    } catch (e) {}
+    } catch (e) { console.error('updateConference failed:', e) }
   },
   deleteConference: async (id) => {
     try {
       await supabase.from('video_conferences').delete().eq('id', id)
       set((s) => ({ conferences: s.conferences.filter((c: Conference) => c.id !== id) }))
-    } catch (e) {}
+    } catch (e) { console.error('deleteConference failed:', e) }
   },
 
   // ========== Notifications ==========
   notifications: [],
   fetchNotifications: async () => {
-    const { data: user } = await supabase.auth.getUser()
-    if (!user.user) return
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.user.id).order('created_at', { ascending: false })
-    set({ notifications: (data as Notification[] | null) || [] })
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data, error } = await supabase.from('notifications').select('*').eq('user_id', user.user.id).order('created_at', { ascending: false })
+      if (error) { console.error('fetchNotifications failed:', error); return }
+      set({ notifications: (data as Notification[] | null) || [] })
+    } catch (e) { console.error('fetchNotifications failed:', e) }
   },
   markNotificationRead: async (id) => {
     try {
       await supabase.from('notifications').update({ read: true } as any).eq('id', id)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => n.id === id ? { ...n, read: true } : n) }))
-    } catch (e) {}
+    } catch (e) { console.error('markNotificationRead failed:', e) }
   },
   markAllNotificationsRead: async () => {
     try {
@@ -1182,24 +1014,21 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       await supabase.from('notifications').update({ read: true } as any).eq('user_id', user.user.id).eq('read', false)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, read: true })) }))
-    } catch (e) {}
+    } catch (e) { console.error('markAllNotificationsRead failed:', e) }
   },
 
   // ========== Files ==========
   files: [],
   fetchFiles: async (projectId) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      let query = supabase.from('files')
-        .select('*').eq('uploaded_by', user.user.id)
-        .order('created_at', { ascending: false })
+      let query = supabase.from('files').select('*').order('created_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
-      const { data } = await query
+      const { data, error } = await query
+      if (error) { console.error('fetchFiles failed:', error); return }
       set({ files: (data as DBFile[] | null) || [] })
-    } catch (e) {}
+    } catch (e) { console.error('fetchFiles failed:', e) }
   },
-  uploadFile: async (file, projectId, onProgress) => {
+  uploadFile: async (file, projectId, taskId, onProgress) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return null
@@ -1208,21 +1037,33 @@ export const useStore = create<AppState>((set, get) => ({
       const { error: uploadError } = await supabase.storage
         .from('files')
         .upload(filePath, file, { cacheControl: '3600', upsert: false })
-      if (uploadError) return null
+      if (uploadError) { console.error('uploadFile storage error:', uploadError); return null }
       onProgress?.(100)
-      const { data } = await supabase.from('files').insert({
+      const { data, error } = await supabase.from('files').insert({
         name: file.name,
         file_path: filePath,
         file_size: file.size,
         mime_type: file.type || null,
         project_id: projectId || null,
+        task_id: taskId || null,
         uploaded_by: user.user.id,
         is_public: true,
         metadata: {},
       } as any).select().single()
+      if (error) { console.error('uploadFile db error:', error); return null }
       if (data) set((s) => ({ files: [data as DBFile, ...s.files] }))
       return data as DBFile | null
-    } catch (e) {return null }
+    } catch (e) { console.error('uploadFile failed:', e); return null }
+  },
+  moveFile: async (fileId, newProjectId, newTaskId) => {
+    try {
+      const { data, error } = await supabase.from('files')
+        .update({ project_id: newProjectId || null, task_id: newTaskId || null } as any)
+        .eq('id', fileId)
+        .select().single()
+      if (error) { console.error('moveFile failed:', error); return }
+      if (data) set((s) => ({ files: s.files.map(f => f.id === fileId ? data as DBFile : f) }))
+    } catch (e) { console.error('moveFile failed:', e) }
   },
   deleteFile: async (id) => {
     try {
@@ -1230,230 +1071,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (file) await supabase.storage.from('files').remove([file.file_path]).catch(() => {})
       await supabase.from('files').delete().eq('id', id)
       set((s) => ({ files: s.files.filter(f => f.id !== id) }))
-    } catch (e) {}
-  },
-
-  // ========== Team Calendar / Schedules ==========
-  schedules: [],
-  fetchSchedules: async () => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      const { data } = await supabase.from('schedules')
-        .select('*').eq('user_id', user.user.id)
-        .order('start_time', { ascending: true })
-      set({ schedules: (data as Schedule[] | null) || [] })
-    } catch (e) {}
-  },
-  addSchedule: async (s) => {
-    try {
-      const { data: user } = await supabase.auth.getUser()
-      if (!user.user) return
-      const { data } = await supabase.from('schedules').insert({ ...s, user_id: user.user.id } as any).select().single()
-      if (data) set((s) => ({ schedules: [...s.schedules, data as Schedule].sort((a, b) => a.start_time.localeCompare(b.start_time)) }))
-    } catch (e) {}
-  },
-  updateSchedule: async (id, updates) => {
-    try {
-      const { data } = await supabase.from('schedules').update(updates as any).eq('id', id).select().single()
-      if (data) set((s) => ({ schedules: s.schedules.map((sc: Schedule) => sc.id === id ? data as Schedule : sc) }))
-    } catch (e) {}
-  },
-  deleteSchedule: async (id) => {
-    try {
-      await supabase.from('schedules').delete().eq('id', id)
-      set((s) => ({ schedules: s.schedules.filter((sc: Schedule) => sc.id !== id) }))
-    } catch (e) {}
-  },
-
-  // ========== Task Reports ==========
-  taskReports: [],
-  fetchTaskReports: async (projectId?: string) => {
-    try {
-      let q = supabase.from('task_reports').select('*').order('created_at', { ascending: false })
-      if (projectId) q = q.eq('project_id', projectId)
-      const { data, error } = await q
-      if (error) throw error
-      set({ taskReports: data || [] })
-    } catch (e: any) {}
-  },
-  addTaskReport: async (r) => {
-    try {
-      const { data, error } = await supabase.from('task_reports').insert(r).select().single()
-      if (error) throw error
-      set((s) => ({ taskReports: [data, ...s.taskReports] }))
-    } catch (e: any) {}
-  },
-  deleteTaskReport: async (id) => {
-    try {
-      await supabase.from('task_reports').delete().eq('id', id)
-      set((s) => ({ taskReports: s.taskReports.filter((r: TaskReport) => r.id !== id) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Workspace Members ==========
-  workspaceMembers: [],
-  fetchWorkspaceMembers: async (workspaceId: string) => {
-    try {
-      const { data, error } = await supabase.from('workspace_members').select('*').eq('workspace_id', workspaceId).order('joined_at', { ascending: false })
-      if (error) throw error
-      set({ workspaceMembers: data || [] })
-    } catch (e: any) {}
-  },
-  addWorkspaceMember: async (m) => {
-    try {
-      const { data, error } = await supabase.from('workspace_members').insert(m).select().single()
-      if (error) throw error
-      set((s) => ({ workspaceMembers: [data, ...s.workspaceMembers] }))
-    } catch (e: any) {}
-  },
-  updateWorkspaceMember: async (id, updates) => {
-    try {
-      const { data, error } = await supabase.from('workspace_members').update(updates).eq('id', id).select().single()
-      if (error) throw error
-      set((s) => ({ workspaceMembers: s.workspaceMembers.map((m: WorkspaceMember) => m.id === id ? data : m) }))
-    } catch (e: any) {}
-  },
-  removeWorkspaceMember: async (id) => {
-    try {
-      await supabase.from('workspace_members').delete().eq('id', id)
-      set((s) => ({ workspaceMembers: s.workspaceMembers.filter((m: WorkspaceMember) => m.id !== id) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Workspace Templates ==========
-  workspaceTemplates: [],
-  fetchWorkspaceTemplates: async () => {
-    try {
-      const { data, error } = await supabase.from('workspace_templates').select('*').order('created_at', { ascending: false })
-      if (error) throw error
-      set({ workspaceTemplates: data || [] })
-    } catch (e: any) {}
-  },
-  addWorkspaceTemplate: async (t) => {
-    try {
-      const { data, error } = await supabase.from('workspace_templates').insert(t).select().single()
-      if (error) throw error
-      set((s) => ({ workspaceTemplates: [data, ...s.workspaceTemplates] }))
-    } catch (e: any) {}
-  },
-  deleteWorkspaceTemplate: async (id) => {
-    try {
-      await supabase.from('workspace_templates').delete().eq('id', id)
-      set((s) => ({ workspaceTemplates: s.workspaceTemplates.filter((t: WorkspaceTemplate) => t.id !== id) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Content Templates ==========
-  contentTemplates: [],
-  fetchContentTemplates: async (category?: string) => {
-    try {
-      let q = supabase.from('content_templates').select('*').order('created_at', { ascending: false })
-      if (category) q = q.eq('category', category)
-      const { data, error } = await q
-      if (error) throw error
-      set({ contentTemplates: data || [] })
-    } catch (e: any) {}
-  },
-  addContentTemplate: async (t) => {
-    try {
-      const { data, error } = await supabase.from('content_templates').insert(t).select().single()
-      if (error) throw error
-      set((s) => ({ contentTemplates: [data, ...s.contentTemplates] }))
-    } catch (e: any) {}
-  },
-  deleteContentTemplate: async (id) => {
-    try {
-      await supabase.from('content_templates').delete().eq('id', id)
-      set((s) => ({ contentTemplates: s.contentTemplates.filter((t: ContentTemplate) => t.id !== id) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Automation Workflows ==========
-  automationWorkflows: [],
-  fetchAutomationWorkflows: async () => {
-    try {
-      const { data, error } = await supabase.from('automation_workflows').select('*').order('created_at', { ascending: false })
-      if (error) throw error
-      set({ automationWorkflows: data || [] })
-    } catch (e: any) {}
-  },
-  addAutomationWorkflow: async (w) => {
-    try {
-      const { data, error } = await supabase.from('automation_workflows').insert(w).select().single()
-      if (error) throw error
-      set((s) => ({ automationWorkflows: [data, ...s.automationWorkflows] }))
-    } catch (e: any) {}
-  },
-  updateAutomationWorkflow: async (id, updates) => {
-    try {
-      const { data, error } = await supabase.from('automation_workflows').update(updates).eq('id', id).select().single()
-      if (error) throw error
-      set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
-    } catch (e: any) {}
-  },
-  deleteAutomationWorkflow: async (id) => {
-    try {
-      await supabase.from('automation_workflows').delete().eq('id', id)
-      set((s) => ({ automationWorkflows: s.automationWorkflows.filter((w: AutomationWorkflow) => w.id !== id) }))
-    } catch (e: any) {}
-  },
-  toggleAutomationWorkflow: async (id, isActive) => {
-    try {
-      const { data, error } = await supabase.from('automation_workflows').update({ is_active: isActive }).eq('id', id).select().single()
-      if (error) throw error
-      set((s) => ({ automationWorkflows: s.automationWorkflows.map((w: AutomationWorkflow) => w.id === id ? data : w) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Marketing Campaigns ==========
-  marketingCampaigns: [],
-  fetchMarketingCampaigns: async () => {
-    try {
-      const { data, error } = await supabase.from('marketing_campaigns').select('*').order('created_at', { ascending: false })
-      if (error) throw error
-      set({ marketingCampaigns: data || [] })
-    } catch (e: any) {}
-  },
-  addMarketingCampaign: async (c) => {
-    try {
-      const { data, error } = await supabase.from('marketing_campaigns').insert(c).select().single()
-      if (error) throw error
-      set((s) => ({ marketingCampaigns: [data, ...s.marketingCampaigns] }))
-    } catch (e: any) {}
-  },
-  updateMarketingCampaign: async (id, updates) => {
-    try {
-      const { data, error } = await supabase.from('marketing_campaigns').update(updates).eq('id', id).select().single()
-      if (error) throw error
-      set((s) => ({ marketingCampaigns: s.marketingCampaigns.map((c: MarketingCampaign) => c.id === id ? data : c) }))
-    } catch (e: any) {}
-  },
-  deleteMarketingCampaign: async (id) => {
-    try {
-      await supabase.from('marketing_campaigns').delete().eq('id', id)
-      set((s) => ({ marketingCampaigns: s.marketingCampaigns.filter((c: MarketingCampaign) => c.id !== id) }))
-    } catch (e: any) {}
-  },
-
-  // ========== Password Reset ==========
-  resetPassword: async (email) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })
-      if (error) throw error
-      return { error: null }
-    } catch (e: any) {
-      return { error: e }
-    }
-  },
-  updatePassword: async (newPassword) => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-      if (error) throw error
-      return { error: null }
-    } catch (e: any) {
-      return { error: e }
-    }
+    } catch (e) { console.error('deleteFile failed:', e) }
   },
 
   // ========== Realtime Subscriptions ==========
@@ -1561,90 +1179,6 @@ export const useStore = create<AppState>((set, get) => ({
         .subscribe()
       return { __notificationChannel: ch } as any
     })
-  },
-
-  // ========== Data Realtime Subscriptions ==========
-  // Projects realtime — refreshes project list on any project change
-  subscribeToProjects: () => {
-    set((s) => {
-      if ((s as any).__projectsChannel) return s
-      const ch = supabase
-        .channel('projects-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
-          get().fetchProjects()
-        })
-        .subscribe()
-      return { __projectsChannel: ch } as any
-    })
-  },
-
-  // Tasks realtime
-  subscribeToTasks: () => {
-    set((s) => {
-      if ((s as any).__tasksChannel) return s
-      const ch = supabase
-        .channel('tasks-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-          get().fetchTasks()
-        })
-        .subscribe()
-      return { __tasksChannel: ch } as any
-    })
-  },
-
-  // Documents realtime
-  subscribeToDocuments: () => {
-    set((s) => {
-      if ((s as any).__documentsChannel) return s
-      const ch = supabase
-        .channel('documents-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-          get().fetchDocuments()
-        })
-        .subscribe()
-      return { __documentsChannel: ch } as any
-    })
-  },
-
-  // CRM realtime — customers and opportunities
-  subscribeToCRM: () => {
-    set((s) => {
-      if ((s as any).__crmChannel) return s
-      const ch = supabase
-        .channel('crm-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
-          get().fetchCustomers()
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_opportunities' }, () => {
-          get().fetchSalesOpportunities()
-        })
-        .subscribe()
-      return { __crmChannel: ch } as any
-    })
-  },
-
-  subscribeToSchedules: () => {
-    set((s) => {
-      if ((s as any).__schedulesChannel) return s
-      const ch = supabase
-        .channel('schedules-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
-          get().fetchSchedules()
-        })
-        .subscribe()
-      return { __schedulesChannel: ch } as any
-    })
-  },
-
-  // Cleanup all data realtime subscriptions
-  unsubscribeData: () => {
-    const state = get() as any
-    const channels = ['__projectsChannel', '__tasksChannel', '__documentsChannel', '__crmChannel', '__schedulesChannel']
-    channels.forEach(key => {
-      const ch = state[key]
-      if (ch) supabase.removeChannel(ch)
-    })
-    set({ __projectsChannel: null, __tasksChannel: null, __documentsChannel: null, __crmChannel: null, __schedulesChannel: null } as any)
   },
 
 }))

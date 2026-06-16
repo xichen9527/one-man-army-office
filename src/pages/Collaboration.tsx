@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus, Search,
   Trash2, Mail, Crown, Shield, UserCheck, ListTodo, FolderOpen, Edit3, X,
-  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon, CalendarDays, Clock, MapPin, LogOut
+  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
@@ -59,21 +59,6 @@ export default function Collaboration() {
   // Channel name validation state
   const [channelNameError, setChannelNameError] = useState('')
 
-  // Calendar state
-  const [calView, setCalView] = useState<'month' | 'week'>('month')
-  const [calCurrent, setCalCurrent] = useState(new Date())
-  const [showEventDialog, setShowEventDialog] = useState(false)
-  const [eventTitle, setEventTitle] = useState('')
-  const [eventStart, setEventStart] = useState('')
-  const [eventEnd, setEventEnd] = useState('')
-  const [eventType, setEventType] = useState('event')
-  const [eventColor, setEventColor] = useState('#3b82f6')
-  const [eventLocation, setEventLocation] = useState('')
-  const [eventDesc, setEventDesc] = useState('')
-  const [calLoading, setCalLoading] = useState(false)
-  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
-  const [deleteScheduleConfirm, setDeleteScheduleConfirm] = useState<string | null>(null)
-
   // Play beep sound for new messages
   const playBeep = useCallback(() => {
     try {
@@ -93,7 +78,7 @@ export default function Collaboration() {
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.2)
     } catch (e) {
-      // Audio playback error ignored
+      console.warn('Failed to play beep:', e)
     }
   }, [])
 
@@ -257,6 +242,7 @@ export default function Collaboration() {
         setInviteResult(null)
       }, 2000)
     } catch (error: any) {
+      console.error('Invite failed:', error)
       const errorMsg = error?.message || '邀请失败，请重试'
       setInviteResult({ ok: false, msg: errorMsg })
     } finally {
@@ -366,255 +352,6 @@ export default function Collaboration() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  // ======================== CalendarTab ========================
-  const CalendarTab = () => {
-    const { schedules, fetchSchedules, addSchedule, updateSchedule, deleteSchedule } = useStore()
-    const [view, setView] = useState<'month' | 'week'>('month')
-    const [current, setCurrent] = useState(new Date())
-
-    useEffect(() => { fetchSchedules() }, [])
-
-    const today = new Date()
-    const year = current.getFullYear()
-    const month = current.getMonth()
-
-    const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate()
-    const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay()
-    const daysInMonth = getDaysInMonth(year, month)
-    const firstDay = getFirstDay(year, month)
-
-    const prevMonth = () => setCurrent(new Date(year, month - 1, 1))
-    const nextMonth = () => setCurrent(new Date(year, month + 1, 1))
-    const goToday = () => setCurrent(new Date())
-
-    const formatTime = (dt: string) => {
-      const d = new Date(dt)
-      return format(d, 'HH:mm')
-    }
-
-    const handleSaveEvent = async () => {
-      if (!eventTitle.trim()) { toast({ title: '请填写日程标题', variant: 'destructive' }); return }
-      if (!eventStart) { toast({ title: '请选择开始时间', variant: 'destructive' }); return }
-      setCalLoading(true)
-      try {
-        const endVal = eventEnd || null
-        const insertData: any = {
-          title: eventTitle.trim(),
-          event_type: eventType as Schedule['event_type'],
-          start_time: new Date(eventStart).toISOString(),
-          end_time: endVal ? new Date(endVal).toISOString() : null,
-          all_day: !eventEnd,
-          color: eventColor,
-          location: eventLocation.trim() || null,
-          description: eventDesc.trim() || null,
-          remind_before: 0,
-        }
-        if (editingSchedule) {
-          await updateSchedule(editingSchedule.id, insertData)
-          toast({ title: '日程已更新' })
-        } else {
-          await addSchedule(insertData)
-          toast({ title: '日程已创建' })
-        }
-        closeDialog()
-      } catch (err: any) {
-        toast({ title: '保存失败', description: err?.message, variant: 'destructive' })
-      } finally {
-        setCalLoading(false)
-      }
-    }
-
-    const openEditDialog = (s: Schedule) => {
-      setEditingSchedule(s)
-      setEventTitle(s.title)
-      setEventStart(s.start_time.slice(0, 16))
-      setEventEnd(s.end_time ? s.end_time.slice(0, 16) : '')
-      setEventType(s.event_type)
-      setEventColor(s.color)
-      setEventLocation(s.location || '')
-      setEventDesc(s.description || '')
-      setShowEventDialog(true)
-    }
-
-    const handleDeleteSchedule = async () => {
-      if (!deleteScheduleConfirm) return
-      try {
-        await deleteSchedule(deleteScheduleConfirm)
-        setDeleteScheduleConfirm(null)
-        toast({ title: '日程已删除' })
-      } catch {
-        toast({ title: '删除失败', variant: 'destructive' })
-      }
-    }
-
-    const closeDialog = () => {
-      setShowEventDialog(false)
-      setEditingSchedule(null)
-      setEventTitle(''); setEventStart(''); setEventEnd('')
-      setEventType('event'); setEventColor('#3b82f6')
-      setEventLocation(''); setEventDesc('')
-    }
-
-    const getEventsForDay = (day: number) => {
-      const dayStr = (d: number) => {
-        const m = String(month + 1).padStart(2, '0')
-        const dd = String(d).padStart(2, '0')
-        return `${year}-${m}-${dd}`
-      }
-      const target = dayStr(day)
-      return schedules.filter(s => s.start_time.slice(0, 10) === target)
-    }
-
-    const typeLabel: Record<string, string> = { event: '日程', meeting: '会议', deadline: '截止', reminder: '提醒', holiday: '假期' }
-    const typeBg: Record<string, string> = {
-      event: 'bg-blue-100', meeting: 'bg-purple-100', deadline: 'bg-red-100',
-      reminder: 'bg-yellow-100', holiday: 'bg-green-100',
-    }
-
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-
-    // Month grid
-    const cells: (number | null)[] = []
-    for (let i = 0; i < firstDay; i++) cells.push(null)
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-
-    return (
-      <div className="bg-white rounded-xl border shadow-sm p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold">{year}年{month + 1}月</h2>
-            <Button variant="outline" size="sm" onClick={goToday}>今天</Button>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" onClick={prevMonth}>‹</Button>
-            <Button variant="outline" size="sm" onClick={nextMonth}>›</Button>
-          </div>
-        </div>
-
-        {/* Weekday headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {weekDays.map(d => (
-            <div key={d} className="text-center text-xs text-gray-500 py-1 font-medium">{d}</div>
-          ))}
-        </div>
-
-        {/* Day grid */}
-        <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-lg overflow-hidden">
-          {cells.map((day, idx) => {
-            const isToday = day && day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
-            const events = day ? getEventsForDay(day) : []
-            return (
-              <div key={idx} className={`min-h-[80px] bg-white p-1 ${!day ? 'opacity-30' : ''}`}>
-                {day && (
-                  <>
-                    <div className={`text-xs font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-500 text-white' : 'text-gray-600'}`}>
-                      {day}
-                    </div>
-                    {events.slice(0, 2).map(ev => (
-                      <div key={ev.id} className={`text-xs px-1 py-0.5 rounded truncate mb-0.5 cursor-pointer ${typeBg[ev.event_type] || 'bg-gray-100'}`}
-                        onClick={() => openEditDialog(ev)}
-                        title={`${ev.title} (${typeLabel[ev.event_type] || ev.event_type})`}>
-                        {ev.title}
-                      </div>
-                    ))}
-                    {events.length > 2 && (
-                      <div className="text-xs text-gray-400 px-1">+{events.length - 2} 更多</div>
-                    )}
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Upcoming events list */}
-        <div className="mt-4">
-          <div className="text-sm font-medium mb-2 text-gray-600">即将到来</div>
-          {schedules.filter(s => new Date(s.start_time) >= today).slice(0, 5).length === 0 && (
-            <p className="text-xs text-gray-400">近期无日程</p>
-          )}
-          {schedules.filter(s => new Date(s.start_time) >= today).slice(0, 5).map(ev => (
-            <div key={ev.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 last:border-0">
-              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: ev.color }} />
-              <span className="text-xs font-medium text-gray-700 truncate flex-1">{ev.title}</span>
-              <span className="text-xs text-gray-400">{formatTime(ev.start_time)}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded ${typeBg[ev.event_type] || 'bg-gray-100'}`}>{typeLabel[ev.event_type] || ev.event_type}</span>
-              <button className="text-xs text-gray-400 hover:text-red-500" onClick={() => setDeleteScheduleConfirm(ev.id)}>×</button>
-            </div>
-          ))}
-        </div>
-
-        <Button className="mt-3 w-full" onClick={() => { setEditingSchedule(null); setShowEventDialog(true) }}>
-          <Plus className="w-4 h-4 mr-1" />新建日程
-        </Button>
-
-        {/* New / Edit Event Dialog */}
-        <Dialog open={showEventDialog} onOpenChange={(v) => { if (!v) closeDialog() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingSchedule ? '编辑日程' : '新建日程'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="日程标题" value={eventTitle} onChange={e => setEventTitle(e.target.value)} />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">开始时间</label>
-                  <Input type="datetime-local" value={eventStart} onChange={e => setEventStart(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">结束时间</label>
-                  <Input type="datetime-local" value={eventEnd} onChange={e => setEventEnd(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">类型</label>
-                <select value={eventType} onChange={e => setEventType(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm">
-                  <option value="event">日程</option>
-                  <option value="meeting">会议</option>
-                  <option value="deadline">截止</option>
-                  <option value="reminder">提醒</option>
-                  <option value="holiday">假期</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">颜色</label>
-                <div className="flex gap-2">
-                  {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map(c => (
-                    <button key={c} type="button" onClick={() => setEventColor(c)}
-                      className="w-7 h-7 rounded-full border-2 transition-all"
-                      style={{ backgroundColor: c, borderColor: eventColor === c ? '#000' : 'transparent' }} />
-                  ))}
-                </div>
-              </div>
-              <Input placeholder="地点（可选）" value={eventLocation} onChange={e => setEventLocation(e.target.value)} />
-              <textarea placeholder="备注（可选）" value={eventDesc} onChange={e => setEventDesc(e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm resize-none h-16" />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={closeDialog}>取消</Button>
-              <Button onClick={handleSaveEvent} disabled={calLoading}>
-                {calLoading ? '保存中...' : editingSchedule ? '更新' : '创建'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirm Dialog */}
-        <Dialog open={!!deleteScheduleConfirm} onOpenChange={(v) => { if (!v) setDeleteScheduleConfirm(null) }}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>确认删除</DialogTitle></DialogHeader>
-            <p className="text-sm text-gray-600">确定要删除这个日程吗？此操作无法撤销。</p>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteScheduleConfirm(null)}>取消</Button>
-              <Button variant="destructive" onClick={handleDeleteSchedule}>删除</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <Tabs defaultValue="chat" className="space-y-4">
@@ -622,7 +359,6 @@ export default function Collaboration() {
           <TabsTrigger value="chat" className="gap-1.5"><MessageSquare className="w-4 h-4" />即时聊天</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5"><Users className="w-4 h-4" />成员管理</TabsTrigger>
           <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="w-4 h-4" />协同任务</TabsTrigger>
-          <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="w-4 h-4" />团队日历</TabsTrigger>
         </TabsList>
 
         {/* ========== Chat ========== */}
@@ -700,10 +436,11 @@ export default function Collaboration() {
                               <DropdownMenu.Item
                                 className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                                 onSelect={() => {
-                                  const myMember = members.find(m => m.user_id === currentUser?.id)
-                                  if (myMember && confirm('确定要退出该频道吗？')) {
-                                    removeMember(myMember.id)
+                                  if (confirm('确定要退出该频道吗？')) {
+                                    // 实际退出频道逻辑
+                                    removeMember(currentUser.id, ch.id)
                                       .then(() => {
+                                        // 如果当前正在这个频道，切换到另一个
                                         if (activeChannel === ch.id) {
                                           const otherChannel = channels.find(c => c.id !== ch.id)
                                           setActiveChannel(otherChannel?.id || null)
@@ -714,12 +451,22 @@ export default function Collaboration() {
                                           message: `你已成功退出「${ch.name}」频道`,
                                           read: false,
                                           created_at: new Date().toISOString(),
-                                        } as any)
+                                        })
+                                      })
+                                      .catch((err) => {
+                                        console.error('退出频道失败:', err)
+                                        addNotification({
+                                          type: 'error',
+                                          title: '退出失败',
+                                          message: '无法退出频道，请稍后重试',
+                                          read: false,
+                                          created_at: new Date().toISOString(),
+                                        })
                                       })
                                   }
                                 }}
                               >
-                                <LogOut className="w-4 h-4" /> 退出频道
+                                <X className="w-4 h-4" /> 退出频道
                               </DropdownMenu.Item>
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>
@@ -1080,11 +827,6 @@ export default function Collaboration() {
               )
             })}
           </div>
-        </TabsContent>
-
-        {/* ========== Team Calendar ========== */}
-        <TabsContent value="calendar" className="mt-0">
-          <CalendarTab />
         </TabsContent>
       </Tabs>
 

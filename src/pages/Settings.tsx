@@ -12,35 +12,22 @@ import {
   Bell, 
   Shield, 
   Palette, 
-  Globe as GlobeIcon,
-  Video,
+  Globe,
   Upload,
   AlertCircle,
   Check,
   Bot,
   Plus,
-  Trash2 as Trash2Icon,
+  Trash2,
   Edit3,
   Key,
   Link,
   CheckCircle,
   XCircle,
   Loader2,
-  Save,
-  Zap,
-  Play,
-  Pause,
-  Settings as LucideSettingsIcon,
+  Save
 } from 'lucide-react'
 import { useStore } from '@/store'
-import { toast } from '@/components/ui/toast'
-import { 
-  generateTOTPSecret, 
-  generateOTPAuthURL, 
-  generateQRCodeDataURL, 
-  verifyTOTP,
-  formatSecret 
-} from '@/lib/totp'
 
 // 密码强度类型
 type PasswordStrength = 'weak' | 'medium' | 'strong'
@@ -48,96 +35,8 @@ type PasswordStrength = 'weak' | 'medium' | 'strong'
 // 主题类型
 type Theme = 'light' | 'dark' | 'auto'
 
-// ========== Automation Workflow Tab ==========
-function AutomationTab() {
-  const { automationWorkflows, fetchAutomationWorkflows, addAutomationWorkflow, updateAutomationWorkflow, deleteAutomationWorkflow, toggleAutomationWorkflow } = useStore()
-  const [showDialog, setShowDialog] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [wfName, setWfName] = useState('')
-  const [wfDesc, setWfDesc] = useState('')
-  const [wfTrigger, setWfTrigger] = useState<'schedule' | 'event' | 'webhook'>('schedule')
-  const [wfConfig, setWfConfig] = useState('')
-  const [wfActions, setWfActions] = useState('')
-
-  useEffect(() => { fetchAutomationWorkflows() }, [])
-
-  const handleSave = async () => {
-    if (!wfName.trim()) return
-    try {
-      const data = { name: wfName, trigger_type: wfTrigger, trigger_config: wfConfig, actions: wfActions, is_active: true }
-      if (editId) {
-        await updateAutomationWorkflow(editId, { ...data, description: wfDesc })
-      } else {
-        await addAutomationWorkflow({ ...data, description: wfDesc, last_run_at: null, run_count: 0 })
-      }
-      setShowDialog(false); setEditId(null); setWfName(''); setWfDesc(''); setWfTrigger('schedule'); setWfConfig(''); setWfActions('')
-    } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) }
-  }
-
-  const openEdit = (wf: any) => {
-    setEditId(wf.id); setWfName(wf.name); setWfDesc(wf.description || ''); setWfTrigger(wf.trigger_type); setWfConfig(typeof wf.trigger_config === 'string' ? wf.trigger_config : JSON.stringify(wf.trigger_config)); setWfActions(typeof wf.actions === 'string' ? wf.actions : JSON.stringify(wf.actions)); setShowDialog(true)
-  }
-
-  const triggerLabels = { schedule: '定时', event: '事件', webhook: 'Webhook' }
-
-  return (
-    <>
-      <div className="flex justify-end mb-4">
-        <Button size="sm" onClick={() => { setEditId(null); setWfName(''); setWfDesc(''); setWfTrigger('schedule'); setWfConfig(''); setWfActions(''); setShowDialog(true) }}>
-          <Plus className="w-4 h-4 mr-1" /> 创建工作流
-        </Button>
-      </div>
-      {automationWorkflows.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">暂无自动化工作流，点击右上角创建</div>
-      ) : (
-        <div className="grid gap-3">
-          {automationWorkflows.map(wf => (
-            <Card key={wf.id}>
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900 truncate">{wf.name}</span>
-                    <Badge variant="secondary" className="text-xs">{triggerLabels[wf.trigger_type]}</Badge>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{wf.description || '—'}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {wf.last_run_at ? `上次运行: ${new Date(wf.last_run_at).toLocaleString('zh-CN')}` : '从未运行'}
-                    {wf.run_count > 0 && ` · 运行 ${wf.run_count} 次`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Switch checked={wf.is_active} onCheckedChange={async (v) => { try { await toggleAutomationWorkflow(wf.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } }} />
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(wf)}><LucideSettingsIcon className="w-4 h-4" /></Button>
-                  <Button size="icon" variant="ghost" onClick={async () => { if (confirm('确认删除？')) { try { await deleteAutomationWorkflow(wf.id) } catch (e: any) { toast({ title: '错误', description: e.message, variant: 'destructive' }) } } }}><Trash2Icon className="w-4 h-4 text-red-400" /></Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editId ? '编辑工作流' : '创建工作流'}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>名称</Label><Input value={wfName} onChange={e => setWfName(e.target.value)} placeholder="工作流名称" /></div>
-            <div><Label>描述</Label><Input value={wfDesc} onChange={e => setWfDesc(e.target.value)} placeholder="可选描述" /></div>
-            <div><Label>触发类型</Label>
-              <select value={wfTrigger} onChange={e => setWfTrigger(e.target.value as any)} className="w-full border rounded-md px-3 py-2 text-sm bg-white">
-                <option value="schedule">定时</option><option value="event">事件</option><option value="webhook">Webhook</option>
-              </select>
-            </div>
-            <div><Label>触发配置（JSON）</Label><textarea value={wfConfig} onChange={e => setWfConfig(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm h-16 font-mono" placeholder='{"cron": "0 9 * * *"}' /></div>
-            <div><Label>执行动作（JSON）</Label><textarea value={wfActions} onChange={e => setWfActions(e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm h-20 font-mono" placeholder='{"type": "email", "to": "..."}' /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button><Button onClick={handleSave}>保存</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
 export default function Settings() {
-  const { currentUser, automationWorkflows, fetchAutomationWorkflows, addAutomationWorkflow, updateAutomationWorkflow, deleteAutomationWorkflow, toggleAutomationWorkflow } = useStore()
+  const { currentUser } = useStore()
   const [fullName, setFullName] = useState(currentUser?.full_name || '')
   const [username, setUsername] = useState(currentUser?.username || '')
   const [saved, setSaved] = useState(false)
@@ -146,11 +45,8 @@ export default function Settings() {
   
   // 密码强度状态
   const [newPassword, setNewPassword] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>('weak')
   const [strengthText, setStrengthText] = useState('')
-  const [changingPassword, setChangingPassword] = useState(false)
   
   // 浏览器通知状态
   const [browserNotification, setBrowserNotification] = useState(false)
@@ -172,11 +68,8 @@ export default function Settings() {
   const [notifSystem, setNotifSystem] = useState(() => localStorage.getItem('notif_system') !== 'false')
   const [show2FADialog, setShow2FADialog] = useState(false)
   const [twoStepEnabled, setTwoStepEnabled] = useState(false)
-  const [twoStepSetupStep, setTwoStepSetupStep] = useState<'intro' | 'qr' | 'verify'>('intro')
+  const [twoStepSetupStep, setTwoStepSetupStep] = useState<'intro' | 'confirm' | 'verify'>('intro')
   const [twoStepCode, setTwoStepCode] = useState('')
-  const [twoFASecret, setTwoFASecret] = useState('')
-  const [twoFAQrCode, setTwoFAQrCode] = useState('')
-  const [twoFAVerifying, setTwoFAVerifying] = useState(false)
 
   // 语言设置状态
   const [language, setLanguage] = useState('zh-CN')
@@ -380,9 +273,9 @@ export default function Settings() {
         await storeState.loadUser()
       }
 
-      toast('头像上传成功！')
+      alert('头像上传成功！')
     } catch (error: any) {
-      toast('上传失败: ' + error.message, 'error')
+      alert('上传失败: ' + error.message)
     } finally {
       setUploading(false)
     }
@@ -391,7 +284,7 @@ export default function Settings() {
   // 处理浏览器通知开关
   const handleBrowserNotificationChange = async (checked: boolean) => {
     if (!('Notification' in window)) {
-      toast('您的浏览器不支持通知功能', 'warning')
+      alert('您的浏览器不支持通知功能')
       return
     }
 
@@ -408,14 +301,14 @@ export default function Settings() {
           icon: '/favicon.ico'
         })
       } else if (permission === 'denied') {
-        toast('通知权限被拒绝，请在浏览器设置中允许通知', 'warning')
+        alert('通知权限被拒绝，请在浏览器设置中允许通知')
         setBrowserNotification(false)
       } else {
         setBrowserNotification(false)
       }
     } else {
       setBrowserNotification(false)
-      toast('已关闭浏览器通知。如需重新启用，请点击开关并允许通知权限。', 'info')
+      alert('已关闭浏览器通知。如需重新启用，请点击开关并允许通知权限。')
     }
   }
 
@@ -435,9 +328,6 @@ export default function Settings() {
     if (checked) {
       // 启用：显示设置对话框
       setTwoStepSetupStep('intro')
-      setTwoStepCode('')
-      setTwoFASecret('')
-      setTwoFAQrCode('')
       setShow2FADialog(true)
     } else {
       // 禁用：需要确认
@@ -447,75 +337,22 @@ export default function Settings() {
     }
   }
 
-  // 生成二维码
-  const handleGenerate2FAQR = async () => {
-    if (!currentUser?.email) {
-      toast('无法获取用户邮箱', 'error')
-      return
-    }
-    
-    try {
-      // 生成密钥
-      const secret = generateTOTPSecret()
-      setTwoFASecret(secret)
-      
-      // 生成 otpauth URL
-      const otpauthUrl = generateOTPAuthURL(currentUser.email, secret)
-      
-      // 生成二维码
-      const qrDataUrl = await generateQRCodeDataURL(otpauthUrl)
-      setTwoFAQrCode(qrDataUrl)
-      
-      // 进入下一步
-      setTwoStepSetupStep('qr')
-    } catch (e: any) {
-      toast('生成二维码失败: ' + e.message, 'error')
-    }
-  }
-
-  // 验证并启用
   const handleEnable2FA = async () => {
-    if (!twoStepCode || twoStepCode.length !== 6) {
-      toast('请输入6位验证码', 'warning')
-      return
-    }
-    
-    if (!twoFASecret) {
-      toast('密钥未生成，请重新开始', 'error')
-      return
-    }
-    
-    setTwoFAVerifying(true)
-    
     try {
-      // 验证 TOTP 代码
-      const isValid = verifyTOTP(twoStepCode, twoFASecret)
-      
-      if (!isValid) {
-        toast('验证码错误，请重新输入', 'error')
-        return
-      }
-      
       const { supabase: sb } = await import('@/db/supabase')
-      
-      // 保存密钥并启用 2FA
+      // 更新 profiles 表的 2FA 设置
       const { error } = await sb
         .from('profiles')
-        .update({ 
-          two_factor_enabled: true,
-          two_factor_secret: twoFASecret
-        })
+        .update({ two_factor_enabled: true })
         .eq('id', currentUser?.id)
       
       if (error) throw error
       
       setTwoStepEnabled(true)
       setShow2FADialog(false)
-      toast('两步验证已启用！下次登录时需要输入验证码。', 'success')
+      alert('两步验证已启用！下次登录时需要输入验证码。')
     } catch (error: any) {
-      toast('启用两步验证失败: ' + error.message, 'error')
-    } finally {
-      setTwoFAVerifying(false)
+      alert('启用两步验证失败: ' + error.message)
     }
   }
 
@@ -524,18 +361,15 @@ export default function Settings() {
       const { supabase: sb } = await import('@/db/supabase')
       const { error } = await sb
         .from('profiles')
-        .update({ 
-          two_factor_enabled: false,
-          two_factor_secret: null 
-        })
+        .update({ two_factor_enabled: false })
         .eq('id', currentUser?.id)
       
       if (error) throw error
       
       setTwoStepEnabled(false)
-      toast('两步验证已关闭。', 'success')
+      alert('两步验证已关闭。')
     } catch (error: any) {
-      toast('关闭两步验证失败: ' + error.message, 'error')
+      alert('关闭两步验证失败: ' + error.message)
     }
   }
 
@@ -559,58 +393,33 @@ export default function Settings() {
 
   // 修改密码
   const handleChangePassword = async () => {
-    const cp = currentPassword
-    const np = newPassword
-    const cfp = confirmPassword
+    const cp = (document.getElementById('currentPassword') as HTMLInputElement)?.value
+    const np = (document.getElementById('newPassword') as HTMLInputElement)?.value
+    const cfp = (document.getElementById('confirmPassword') as HTMLInputElement)?.value
     
     if (!cp || !np || !cfp) { 
-      toast('请填写所有密码字段', 'warning')
+      alert('请填写所有密码字段') 
       return 
     }
     if (np !== cfp) { 
-      toast('两次输入的新密码不一致', 'warning')
+      alert('两次输入的新密码不一致') 
       return 
     }
     if (np.length < 6) { 
-      toast('密码长度至少6位', 'warning')
+      alert('密码长度至少6位') 
       return 
     }
     
-    setChangingPassword(true)
-    try {
-      const { supabase: sb } = await import('@/db/supabase')
-      
-      // Step 1: Verify current password by re-authenticating
-      const { data: { user } } = await sb.auth.getUser()
-      if (!user?.email) {
-        toast('无法获取用户信息', 'error')
-        return
-      }
-      
-      const { error: signInError } = await sb.auth.signInWithPassword({
-        email: user.email,
-        password: cp
-      })
-      
-      if (signInError) {
-        toast('当前密码错误', 'error')
-        return
-      }
-      
-      // Step 2: Update to new password
-      const { error: updateError } = await sb.auth.updateUser({ password: np })
-      if (updateError) { 
-        toast('修改失败: ' + updateError.message, 'error')
-      } else {
-        toast('密码修改成功', 'success')
-        setCurrentPassword('')
-        setNewPassword('')
-        setConfirmPassword('')
-      }
-    } catch (e: any) {
-      toast('修改失败: ' + (e.message || '未知错误'), 'error')
-    } finally {
-      setChangingPassword(false)
+    const { supabase: sb } = await import('@/db/supabase')
+    const { error } = await sb.auth.updateUser({ password: np })
+    if (error) { 
+      alert('修改失败: ' + error.message) 
+    } else {
+      alert('密码修改成功')
+      ;(document.getElementById('currentPassword') as HTMLInputElement).value = ''
+      ;(document.getElementById('newPassword') as HTMLInputElement).value = ''
+      ;(document.getElementById('confirmPassword') as HTMLInputElement).value = ''
+      setNewPassword('')
     }
   }
 
@@ -676,10 +485,6 @@ export default function Settings() {
             <Shield className="mr-2 h-4 w-4" />
             安全设置
           </TabsTrigger>
-          <TabsTrigger value="automation">
-            <Zap className="mr-2 h-4 w-4" />
-            自动化
-          </TabsTrigger>
           <TabsTrigger value="appearance">
             <Palette className="mr-2 h-4 w-4" />
             外观设置
@@ -687,10 +492,6 @@ export default function Settings() {
           <TabsTrigger value="language">
             <Globe className="mr-2 h-4 w-4" />
             语言设置
-          </TabsTrigger>
-          <TabsTrigger value="third-party-services">
-            <Link className="mr-2 h-4 w-4" />
-            第三方服务
           </TabsTrigger>
           <TabsTrigger value="ai-models">
             <Bot className="mr-2 h-4 w-4" />
@@ -883,9 +684,6 @@ export default function Settings() {
         </TabsContent>
 
         {/* 安全设置 */}
-        <TabsContent value="automation" className="space-y-4">
-          <AutomationTab />
-        </TabsContent>
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
@@ -897,7 +695,7 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">当前密码</Label>
-                <Input id="currentPassword" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                <Input id="currentPassword" type="password" />
               </div>
               
               <div className="space-y-2">
@@ -913,17 +711,10 @@ export default function Settings() {
               
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">确认新密码</Label>
-                <Input id="confirmPassword" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                <Input id="confirmPassword" type="password" />
               </div>
               
-              <Button onClick={handleChangePassword} disabled={changingPassword}>
-                {changingPassword ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    修改中...
-                  </>
-                ) : '修改密码'}
-              </Button>
+              <Button onClick={handleChangePassword}>修改密码</Button>
             </CardContent>
           </Card>
 
@@ -1037,21 +828,6 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        {/* 第三方服务 */}
-        <TabsContent value="third-party-services" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>第三方服务连接</CardTitle>
-              <CardDescription>
-                配置第三方服务的 API 凭证，数据仅保存在本地浏览器中
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ThirdPartyServices />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* AI 模型 */}
         <TabsContent value="ai-models" className="space-y-4">
           <Card>
@@ -1070,7 +846,7 @@ export default function Settings() {
 
       {/* 两步验证设置对话框 */}
       <Dialog open={show2FADialog} onOpenChange={setShow2FADialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>启用两步验证</DialogTitle>
             <DialogDescription>
@@ -1089,33 +865,15 @@ export default function Settings() {
                 </div>
               </div>
             )}
-            {twoStepSetupStep === 'qr' && (
+            {twoStepSetupStep === 'confirm' && (
               <div className="space-y-3">
-                <p className="text-sm text-gray-600">使用身份验证器应用扫描下方二维码：</p>
-                {twoFAQrCode ? (
-                  <div className="flex justify-center p-4 bg-white rounded-lg">
-                    <img src={twoFAQrCode} alt="2FA QR Code" className="w-48 h-48" />
-                  </div>
-                ) : (
-                  <div className="flex justify-center p-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-                  </div>
-                )}
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">如果无法扫描，请手动输入密钥：</p>
-                  <code className="text-sm font-mono break-all">{formatSecret(twoFASecret)}</code>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="twoStepCode">输入验证码</Label>
-                  <Input
-                    id="twoStepCode"
-                    placeholder="输入6位验证码"
-                    value={twoStepCode}
-                    onChange={e => setTwoStepCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    maxLength={6}
-                    className="text-center text-2xl tracking-widest"
-                  />
-                </div>
+                <p className="text-sm text-gray-600">点击下方按钮完成设置：</p>
+                <Input
+                  placeholder="输入验证码"
+                  value={twoStepCode}
+                  onChange={e => setTwoStepCode(e.target.value)}
+                />
+                <p className="text-xs text-gray-400">演示模式：输入任意6位数字即可通过</p>
               </div>
             )}
           </div>
@@ -1123,23 +881,13 @@ export default function Settings() {
             {twoStepSetupStep === 'intro' && (
               <>
                 <Button variant="outline" onClick={() => setShow2FADialog(false)}>取消</Button>
-                <Button onClick={handleGenerate2FAQR}>生成二维码</Button>
+                <Button onClick={() => setTwoStepSetupStep('confirm')}>继续设置</Button>
               </>
             )}
-            {twoStepSetupStep === 'qr' && (
+            {twoStepSetupStep === 'confirm' && (
               <>
                 <Button variant="outline" onClick={() => { setShow2FADialog(false); setTwoStepSetupStep('intro') }}>取消</Button>
-                <Button 
-                  onClick={handleEnable2FA} 
-                  disabled={twoStepCode.length !== 6 || twoFAVerifying}
-                >
-                  {twoFAVerifying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      验证中...
-                    </>
-                  ) : '完成设置'}
-                </Button>
+                <Button onClick={handleEnable2FA} disabled={twoStepCode.length !== 6}>完成设置</Button>
               </>
             )}
           </DialogFooter>
@@ -1264,7 +1012,7 @@ function AIModelSettings() {
               {testing === api.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
             </Button>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(api)}><Edit3 className="w-3.5 h-3.5" /></Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-red-500" onClick={() => handleDelete(api.id)}><Trash2Icon className="w-3.5 h-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:text-red-500" onClick={() => handleDelete(api.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
           </div>
         </div>
       ))}
@@ -1350,259 +1098,3 @@ function AIModelSettings() {
     </div>
   )
 }
-
-// ========== Third-Party Services (用户自主连接) ==========
-interface ThirdPartyCredential {
-  id: string
-  service: string
-  label: string
-  fields: { key: string; label: string; type?: string; placeholder?: string }[]
-}
-
-const THIRD_PARTY_SERVICES: ThirdPartyCredential[] = [
-  {
-    id: 'tencent-meeting',
-    service: 'tencent-meeting',
-    label: '腾讯会议',
-    fields: [
-      { key: 'app_id', label: 'App ID', placeholder: '腾讯会议开放平台 App ID' },
-      { key: 'secret_key', label: 'Secret Key', type: 'password', placeholder: '腾讯会议开放平台 Secret Key' },
-    ],
-  },
-  {
-    id: 'social-weibo',
-    service: 'social-weibo',
-    label: '微博',
-    fields: [
-      { key: 'app_key', label: 'App Key', placeholder: '微博开放平台 App Key' },
-      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: '微博开放平台 App Secret' },
-    ],
-  },
-  {
-    id: 'social-wechat',
-    service: 'social-wechat',
-    label: '微信公众号',
-    fields: [
-      { key: 'app_id', label: 'AppID', placeholder: '微信公众平台 AppID' },
-      { key: 'app_secret', label: 'AppSecret', type: 'password', placeholder: '微信公众平台 AppSecret' },
-    ],
-  },
-  {
-    id: 'social-douyin',
-    service: 'social-douyin',
-    label: '抖音',
-    fields: [
-      { key: 'client_key', label: 'Client Key', placeholder: '抖音开放平台 Client Key' },
-      { key: 'client_secret', label: 'Client Secret', type: 'password', placeholder: '抖音开放平台 Client Secret' },
-    ],
-  },
-  {
-    id: 'social-xiaohongshu',
-    service: 'social-xiaohongshu',
-    label: '小红书',
-    fields: [
-      { key: 'app_key', label: 'App Key', placeholder: '小红书开放平台 App Key' },
-      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: '小红书开放平台 App Secret' },
-    ],
-  },
-  {
-    id: 'social-bilibili',
-    service: 'social-bilibili',
-    label: 'B站',
-    fields: [
-      { key: 'app_key', label: 'App Key', placeholder: 'B站开放平台 App Key' },
-      { key: 'app_secret', label: 'App Secret', type: 'password', placeholder: 'B站开放平台 App Secret' },
-    ],
-  },
-  {
-    id: 'social-zhihu',
-    service: 'social-zhihu',
-    label: '知乎',
-    fields: [
-      { key: 'client_id', label: 'Client ID', placeholder: '知乎开放平台 Client ID' },
-      { key: 'client_secret', label: 'Client Secret', type: 'password', placeholder: '知乎开放平台 Client Secret' },
-    ],
-  },
-]
-
-const TP_STORAGE_KEY = 'third_party_credentials'
-
-export function getThirdPartyCredentials(serviceId: string): Record<string, string> {
-  try {
-    const all = JSON.parse(localStorage.getItem(TP_STORAGE_KEY) || '{}')
-    return all[serviceId] || {}
-  } catch { return {} }
-}
-
-function ThirdPartyServices() {
-  const [creds, setCreds] = useState<Record<string, Record<string, string>>>(() => {
-    try { return JSON.parse(localStorage.getItem(TP_STORAGE_KEY) || '{}') } catch { return {} }
-  })
-  const [editing, setEditing] = useState<string | null>(null)
-  const [forms, setForms] = useState<Record<string, Record<string, string>>>({})
-  const [testing, setTesting] = useState<string | null>(null)
-  const [testResult, setTestResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null)
-
-  const save = (data: Record<string, Record<string, string>>) => {
-    localStorage.setItem(TP_STORAGE_KEY, JSON.stringify(data))
-    setCreds(data)
-  }
-
-  const handleSave = (svc: ThirdPartyCredential) => {
-    const form = forms[svc.id] || {}
-    const updated = { ...creds, [svc.id]: form }
-    save(updated)
-    setEditing(null)
-  }
-
-  const handleClear = (svcId: string) => {
-    const updated = { ...creds }
-    delete updated[svcId]
-    save(updated)
-    setForms(f => { const n = { ...f }; delete n[svcId]; return n })
-  }
-
-  const handleTest = async (svc: ThirdPartyCredential) => {
-    const form = forms[svc.id] || creds[svc.id] || {}
-    setTesting(svc.id)
-    setTestResult(null)
-    try {
-      if (svc.id === 'tencent-meeting') {
-        if (!form.app_id || !form.secret_key) {
-          setTestResult({ id: svc.id, ok: false, msg: '请先填写 App ID 和 Secret Key' })
-          return
-        }
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-        const resp = await fetch(`${supabaseUrl}/functions/v1/tencent-meeting-api`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'test', credentials: { app_id: form.app_id, secret_key: form.secret_key } }),
-          signal: AbortSignal.timeout(10000),
-        })
-        if (resp.ok) {
-          setTestResult({ id: svc.id, ok: true, msg: '连接成功 ✅' })
-        } else {
-          const err = await resp.json().catch(() => ({}))
-          setTestResult({ id: svc.id, ok: false, msg: `失败: ${err.error || err.detail || resp.statusText}` })
-        }
-      } else if (svc.id.startsWith('social-')) {
-        const platform = svc.id.replace('social-', '')
-        const hasAll = svc.fields.every(f => form[f.key]?.trim())
-        if (!hasAll) {
-          setTestResult({ id: svc.id, ok: false, msg: '请先填写所有必填字段' })
-          return
-        }
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-        const resp = await fetch(`${supabaseUrl}/functions/v1/social-oauth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'test', platform, credentials: form }),
-          signal: AbortSignal.timeout(10000),
-        })
-        const data = await resp.json().catch(() => ({}))
-        if (resp.ok && data.ok !== false) {
-          setTestResult({ id: svc.id, ok: true, msg: data.msg || `${svc.label}凭证验证通过 ✅` })
-        } else {
-          setTestResult({ id: svc.id, ok: false, msg: `失败: ${data.msg || data.error || data.detail || resp.statusText}` })
-        }
-      }
-    } catch (e: any) {
-      setTestResult({ id: svc.id, ok: false, msg: `连接失败: ${e.message || '网络错误'}` })
-    } finally {
-      setTesting(null)
-    }
-  }
-
-  const isConfigured = (svcId: string) => {
-    const c = creds[svcId]
-    if (!c) return false
-    const svc = THIRD_PARTY_SERVICES.find(s => s.id === svcId)
-    return svc ? svc.fields.every(f => c[f.key]?.trim()) : false
-  }
-
-  return (
-    <div className="space-y-4">
-      {THIRD_PARTY_SERVICES.map(svc => {
-        const isEditing = editing === svc.id
-        const configured = isConfigured(svc.id)
-        const currentCreds = creds[svc.id] || {}
-        const form = forms[svc.id] || currentCreds
-
-        return (
-          <div key={svc.id} className="p-4 rounded-lg border">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                {svc.id.startsWith('social-') ? <GlobeIcon className="w-5 h-5 text-pink-500" /> : <Video className="w-5 h-5 text-blue-500" />}
-                <span className="text-sm font-medium">{svc.label}</span>
-                {configured ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">已配置</span>
-                ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">未配置</span>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {configured && !isEditing && (
-                  <>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleTest(svc)} title="测试连接">
-                      {testing === svc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditing(svc.id)}>编辑</Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs hover:text-red-500" onClick={() => handleClear(svc.id)}>清除</Button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {!configured || isEditing ? (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">
-                  前往 <a href="https://meeting.qq.com" target="_blank" rel="noopener" className="text-blue-500 hover:underline">腾讯会议开放平台</a> 创建企业自建应用获取凭证
-                </p>
-                {svc.fields.map(f => (
-                  <div key={f.key}>
-                    <Label className="text-xs">{f.label}</Label>
-                    <Input
-                      type={f.type || 'text'}
-                      value={form[f.key] || ''}
-                      onChange={e => setForms(prev => ({ ...prev, [svc.id]: { ...(prev[svc.id] || {}), [f.key]: e.target.value } }))}
-                      placeholder={f.placeholder}
-                      className="h-8 text-sm mt-1"
-                    />
-                  </div>
-                ))}
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleSave(svc)} disabled={!svc.fields.every(f => (form[f.key] || '').trim())}>
-                    <Save className="w-3.5 h-3.5 mr-1" />保存
-                  </Button>
-                  {isEditing && (
-                    <Button size="sm" variant="outline" onClick={() => setEditing(null)}>取消</Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-gray-500 space-y-1">
-                {svc.fields.map(f => (
-                  <div key={f.key} className="flex items-center gap-2">
-                    <span className="text-gray-400">{f.label}:</span>
-                    <span className="font-mono">{f.type === 'password' ? '••••••••' : currentCreds[f.key]}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {testResult && (
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${testResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-          {testResult.ok ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-          {testResult.msg}
-          <button onClick={() => setTestResult(null)} className="ml-auto"><XCircle className="w-3.5 h-3.5" /></button>
-        </div>
-      )}
-
-      <p className="text-[10px] text-gray-400 mt-2">凭证数据仅保存在浏览器本地，不会上传到服务器</p>
-    </div>
-  )
-}
-

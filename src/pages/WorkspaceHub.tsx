@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
-import { toast } from '@/components/ui/toast'
 import { format, parseISO, differenceInMinutes, isToday, isYesterday } from 'date-fns'
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
@@ -199,7 +198,7 @@ export default function WorkspaceHub() {
 
   const handleEditStart = (msgId: string, content: string, createdAt: string) => {
     const mins = differenceInMinutes(new Date(), parseISO(createdAt))
-    if (mins > 15) { toast('超过15分钟，无法编辑', 'warning'); return }
+    if (mins > 15) { alert('超过15分钟，无法编辑'); return }
     setEditingMsgId(msgId)
     setEditingContent(content)
   }
@@ -246,14 +245,14 @@ export default function WorkspaceHub() {
       const ext = file.name.split('.').pop() || ''
       const filePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       const { error: uploadError } = await supabase.storage.from('files').upload(filePath, file, { cacheControl: '3600', upsert: false })
-      if (uploadError) { toast('文件上传失败: ' + uploadError.message, 'error'); return }
+      if (uploadError) { alert('文件上传失败: ' + uploadError.message); return }
       const { data: urlData } = supabase.storage.from('files').getPublicUrl(filePath)
       const fileUrl = urlData.publicUrl
       const userName = currentUser?.full_name || currentUser?.username || '匿名用户'
       await sendFileMessage(activeChannel, fileUrl, file.name, userId, userName, replyToMsg?.id || null)
       setReplyToMsg(null)
     } catch {
-      toast('文件上传失败', 'error')
+      alert('文件上传失败')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

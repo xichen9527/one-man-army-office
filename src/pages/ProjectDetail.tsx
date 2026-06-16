@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ArrowLeft, FolderOpen, ListTodo, FileText, Upload, Trash2, Edit3, Plus } from 'lucide-react'
@@ -23,7 +21,6 @@ export default function ProjectDetail() {
   const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
   const [taskDue, setTaskDue] = useState('')
   const [docTitle, setDocTitle] = useState('')
-  const [docType, setDocType] = useState<string>('markdown')
 
   const project = projects.find(p => p.id === id)
 
@@ -79,7 +76,7 @@ export default function ProjectDetail() {
     await addDocument({
       title: docTitle,
       content: '',
-      type: docType as any,
+      type: 'markdown',
       project_id: id,
       task_id: null,
       creator_id: '',
@@ -90,7 +87,6 @@ export default function ProjectDetail() {
     })
     setShowNewDoc(false)
     setDocTitle('')
-    setDocType('markdown')
   }
 
   return (
@@ -379,32 +375,6 @@ export default function ProjectDetail() {
           <DialogHeader><DialogTitle>新建文档</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Input placeholder="文档标题" value={docTitle} onChange={e => setDocTitle(e.target.value)} />
-            <div className="space-y-2">
-              <Label className="text-sm text-gray-500">文档类型</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'markdown', label: 'Markdown', icon: '📝' },
-                  { value: 'richtext', label: '富文本', icon: '📄' },
-                  { value: 'code', label: '代码', icon: '💻' },
-                  { value: 'word', label: 'Word', icon: '📊' },
-                  { value: 'excel', label: 'Excel', icon: '📈' },
-                  { value: 'ppt', label: 'PPT', icon: '🎯' },
-                  { value: 'mindmap', label: '思维导图', icon: '🧠' },
-                  { value: 'flowchart', label: '流程图', icon: '🔀' },
-                  { value: 'other', label: '其他', icon: '📎' },
-                ].map(t => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => setDocType(t.value)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${docType === t.value ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'}`}
-                  >
-                    <span>{t.icon}</span>
-                    <span>{t.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewDoc(false)}>取消</Button>

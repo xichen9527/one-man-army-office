@@ -1,0 +1,494 @@
+import { create } from 'zustand'
+import { supabase } from '@/db/supabase'
+import type { Profile, Project, Task, Document, Channel, Message, Notification, AIConversation, AIMessage, Customer, SalesOpportuniy, SocialAccount, SocialPost, TrendingTopic, Conference, TeamMember, Invitation, DBFile } from '@/types/database'
+
+// ==================== Types ====================
+export type ProjectStatus = 'active' | 'completed' | 'archived'
+export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'completed' | 'cancelled'
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type CustomerStatus = 'active' | 'inactive' | 'potential'
+export type ConferenceStatus = 'scheduled' | 'ongoing' | 'ended' | 'cancelled'
+export type SalesStage = 'initial' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
+export type SocialPostStatus = 'draft' | 'scheduled' | 'published' | 'failed'
+
+// ==================== Store State ====================
+interface AppState {
+  // Auth
+  currentUser: Profile | null
+  isAuthenticated: boolean
+  loading: boolean
+  loadUser: () => Promise<void>
+  signUp: (email: string, password: string, fullName: string, username: string) => Promise<{ error: any }>
+  signIn: (email: string, password: string, remember?: boolean) => Promise<{ error: any }>
+  signOut: () => Promise<void>
+
+  // Projects
+  projects: Project[]
+  fetchProjects: () => Promise<void>
+  addProject: (p: Omit<ProjectInsert, 'owner_id'>) => Promise<void>
+  updateProject: (id: string, updates: ProjectUpdate) => Promise<void>
+  deleteProject: (id: string) => Promise<void>
+
+  // Tasks
+  tasks: Task[]
+  fetchTasks: () => Promise<void>
+  addTask: (t: Omit<TaskInsert, 'creator_id'>) => Promise<void>
+  updateTask: (id: string, updates: TaskUpdate) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
+
+  // Documents
+  documents: Document[]
+  fetchDocuments: (projectId?: string) => Promise<void>
+  addDocument: (d: Omit<DocumentInsert, 'creator_id'>) => Promise<void>
+  updateDocument: (id: string, updates: DocumentUpdate) => Promise<void>
+  deleteDocument: (id: string) => Promise<void>
+
+  // Messages & Channels
+  channels: Channel[]
+  messages: Record<string, Message[]>
+  activeChannel: string | null
+  fetchChannels: () => Promise<void>
+  fetchMessages: (channelId: string) => Promise<void>
+  setActiveChannel: (id: string | null) => void
+  sendMessage: (channelId: string, content: string) => Promise<void>
+
+  // Team
+  members: TeamMember[]
+  invitations: Invitation[]
+  fetchTeamMembers: () => Promise<void>
+  fetchInvitations: () => Promise<void>
+  addMember: (email: string, role: TeamMember['role']) => Promise<void>
+  removeMember: (id: string) => Promise<void>
+
+  // CRM
+  customers: Customer[]
+  fetchCustomers: () => Promise<void>
+  addCustomer: (c: Omit<CustomerInsert, never>) => Promise<void>
+  updateCustomer: (id: string, updates: CustomerUpdate) => Promise<void>
+  deleteCustomer: (id: string) => Promise<void>
+  salesOpportunities: SalesOpportunity[]
+  fetchSalesOpportunities: () => Promise<void>
+  addOpportunity: (o: Omit<SalesOpportunityInsert, never>) => Promise<void>
+  updateOpportunity: (id: string, updates: SalesOpportunityUpdate) => Promise<void>
+
+  // AI
+  aiConversations: AIConversation[]
+  aiMessages: Record<string, AIMessage[]>
+  activeAIConv: string | null
+  fetchAIConversations: () => Promise<void>
+  fetchAIMessages: (convId: string) => Promise<void>
+  setActiveAIConv: (id: string | null) => void
+  createAIConv: (title: string, featureType: AIConversation['feature_type']) => Promise<string>
+  sendAIMessage: (convId: string, content: string) => Promise<void>
+  deleteAIConv: (id: string) => Promise<void>
+
+  // Social Media
+  socialAccounts: SocialAccount[]
+  socialPosts: SocialPost[]
+  trendingTopics: TrendingTopic[]
+  fetchSocialAccounts: () => Promise<void>
+  fetchSocialPosts: (accountId?: string) => Promise<void>
+  fetchTrendingTopics: () => Promise<void>
+  addSocialAccount: (a: Omit<SocialAccountInsert, 'user_id'>) => Promise<void>
+  updateSocialAccount: (id: string, updates: SocialAccountUpdate) => Promise<void>
+  deleteSocialAccount: (id: string) => Promise<void>
+  addSocialPost: (p: Omit<SocialPostInsert, never>) => Promise<void>
+  updateSocialPost: (id: string, updates: SocialPostUpdate) => Promise<void>
+  deleteSocialPost: (id: string) => Promise<void>
+
+  // Video Conference
+  conferences: Conference[]
+  fetchConferences: () => Promise<void>
+  addConference: (c: Omit<ConferenceInsert, 'host_id'>) => Promise<void>
+  updateConference: (id: string, updates: ConferenceUpdate) => Promise<void>
+  deleteConference: (id: string) => Promise<void>
+
+  // Notifications
+  notifications: Notification[]
+  fetchNotifications: () => Promise<void>
+  markNotificationRead: (id: string) => Promise<void>
+  markAllNotificationsRead: () => Promise<void>
+
+  // Files
+  files: DBFile[]
+  fetchFiles: (projectId?: string) => Promise<void>
+}
+
+// ==================== Store Implementation ====================
+export const useStore = create<AppState>((set, get) => ({
+  // ========== Auth ==========
+  currentUser: null,
+  isAuthenticated: false,
+  loading: true,
+
+  loadUser: async () => {
+    set({ loading: true })
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+        set({ currentUser: profile, isAuthenticated: true, loading: false })
+        // 自动加载初始数据
+        get().fetchProjects()
+        get().fetchTasks()
+        get().fetchNotifications()
+      } else {
+        set({ currentUser: null, isAuthenticated: false, loading: false })
+      }
+    } catch {
+      set({ currentUser: null, isAuthenticated: false, loading: false })
+    }
+  },
+
+  signUp: async (email, password, fullName, username) => {
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { full_name: fullName, username } },
+    })
+    if (!error) {
+      // profile 由数据库 trigger 自动创建
+      await get().loadUser()
+    }
+    return { error }
+  },
+
+  signIn: async (email, password, remember = false) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error) await get().loadUser()
+    return { error }
+  },
+
+  signOut: async () => {
+    await supabase.auth.signOut()
+    set({
+      currentUser: null, isAuthenticated: false,
+      projects: [], tasks: [], documents: [], channels: [], messages: {},
+      notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [],
+      conferences: [], customers: [], salesOpportunities: [], members: [], files: [],
+    })
+  },
+
+  // ========== Projects ==========
+  projects: [],
+  fetchProjects: async () => {
+    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
+    set({ projects: data || [] })
+  },
+  addProject: async (p) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id }).select().single()
+    if (data) set(s => ({ projects: [data, ...s.projects] }))
+  },
+  updateProject: async (id, updates) => {
+    const { data } = await supabase.from('projects').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ projects: s.projects.map(p => p.id === id ? data : p) }))
+  },
+  deleteProject: async (id) => {
+    await supabase.from('projects').delete().eq('id', id)
+    set(s => ({ projects: s.projects.filter(p => p.id !== id) }))
+  },
+
+  // ========== Tasks ==========
+  tasks: [],
+  fetchTasks: async () => {
+    const { data } = await supabase.from('tasks').select('*').order('created_at', { ascending: false })
+    set({ tasks: data || [] })
+  },
+  addTask: async (t) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id }).select().single()
+    if (data) set(s => ({ tasks: [data, ...s.tasks] }))
+  },
+  updateTask: async (id, updates) => {
+    const { data } = await supabase.from('tasks').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ tasks: s.tasks.map(t => t.id === id ? data : t) }))
+  },
+  deleteTask: async (id) => {
+    await supabase.from('tasks').delete().eq('id', id)
+    set(s => ({ tasks: s.tasks.filter(t => t.id !== id) }))
+  },
+
+  // ========== Documents ==========
+  documents: [],
+  fetchDocuments: async (projectId) => {
+    let query = supabase.from('documents').select('*').order('updated_at', { ascending: false })
+    if (projectId) query = query.eq('project_id', projectId)
+    const { data } = await query
+    set({ documents: data || [] })
+  },
+  addDocument: async (d) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id }).select().single()
+    if (data) set(s => ({ documents: [data, ...s.documents] }))
+  },
+  updateDocument: async (id, updates) => {
+    const { data } = await supabase.from('documents').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ documents: s.documents.map(d => d.id === id ? data : d) }))
+  },
+  deleteDocument: async (id) => {
+    await supabase.from('documents').delete().eq('id', id)
+    set(s => ({ documents: s.documents.filter(d => d.id !== id) }))
+  },
+
+  // ========== Messages & Channels ==========
+  channels: [],
+  messages: {},
+  activeChannel: null,
+  fetchChannels: async () => {
+    const { data } = await supabase.from('channel_id').select('*').order('created_at')
+    set({ channels: data || [] })
+    if (data && data.length > 0 && !get().activeChannel) {
+      set({ activeChannel: data[0].id })
+      get().fetchMessages(data[0].id)
+    }
+  },
+  fetchMessages: async (channelId) => {
+    const { data } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
+    set(s => ({ messages: { ...s.messages, [channelId]: data || [] } }))
+  },
+  setActiveChannel: (id) => {
+    set({ activeChannel: id })
+    if (id) get().fetchMessages(id)
+  },
+  sendMessage: async (channelId, content) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('messages').insert({
+      channel_id: channelId, sender_id: user.user.id, content, message_type: 'text',
+    }).select().single()
+    if (data) set(s => ({
+      messages: { ...s.messages, [channelId]: [...(s.messages[channelId] || []), data] }
+    }))
+  },
+
+  // ========== Team ==========
+  members: [],
+  invitations: [],
+  fetchTeamMembers: async () => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('team_members').select('*').eq('owner_id', user.user.id)
+    set({ members: data || [] })
+  },
+  fetchInvitations: async () => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('invitations').select('*').eq('team_owner_id', user.user.id)
+    set({ invitations: data || [] })
+  },
+  addMember: async (email, role) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const token = crypto.randomUUID()
+    const { data } = await supabase.from('invitations').insert({
+      team_owner_id: user.user.id, email, role, token,
+    }).select().single()
+    if (data) set(s => ({ invitations: [data, ...s.invitations] }))
+  },
+  removeMember: async (id) => {
+    await supabase.from('team_members').delete().eq('id', id)
+    set(s => ({ members: s.members.filter(m => m.id !== id) }))
+  },
+
+  // ========== CRM ==========
+  customers: [],
+  fetchCustomers: async () => {
+    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false })
+    set({ customers: data || [] })
+  },
+  addCustomer: async (c) => {
+    const { data } = await supabase.from('customers').insert(c).select().single()
+    if (data) set(s => ({ customers: [data, ...s.customers] }))
+  },
+  updateCustomer: async (id, updates) => {
+    const { data } = await supabase.from('customers').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ customers: s.customers.map(c => c.id === id ? data : c) }))
+  },
+  deleteCustomer: async (id) => {
+    await supabase.from('customers').delete().eq('id', id)
+    set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
+  },
+  salesOpportunities: [],
+  fetchSalesOpportunities: async () => {
+    const { data } = await supabase.from('sales_opportunities').select('*').order('created_at', { ascending: false })
+    set({ salesOpportunities: data || [] })
+  },
+  addOpportunity: async (o) => {
+    const { data } = await supabase.from('sales_opportunities').insert(o).select().single()
+    if (data) set(s => ({ salesOpportunities: [data, ...s.salesOpportunities] }))
+  },
+  updateOpportunity: async (id, updates) => {
+    const { data } = await supabase.from('sales_opportunities').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ salesOpportunities: s.salesOpportunities.map(o => o.id === id ? data : o) }))
+  },
+
+  // ========== AI ==========
+  aiConversations: [],
+  aiMessages: {},
+  activeAIConv: null,
+  fetchAIConversations: async () => {
+    const { data } = await supabase.from('ai_conversations').select('*').order('updated_at', { ascending: false })
+    set({ aiConversations: data || [] })
+  },
+  fetchAIMessages: async (convId) => {
+    const { data } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
+    set(s => ({ aiMessages: { ...s.aiMessages, [convId]: data || [] } }))
+  },
+  setActiveAIConv: (id) => set({ activeAIConv: id }),
+  createAIConv: async (title, featureType) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return ''
+    const { data } = await supabase.from('ai_conversations').insert({
+      user_id: user.user.id, feature_type: featureType, title,
+    }).select().single()
+    if (data) {
+      set(s => ({ aiConversations: [data, ...s.aiConversations], activeAIConv: data.id }))
+      return data.id
+    }
+    return ''
+  },
+  sendAIMessage: async (convId, content) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    // 保存用户消息
+    const { data: userMsg } = await supabase.from('ai_messages').insert({
+      conversation_id: convId, role: 'user', content,
+    }).select().single()
+    // 调用 Edge Function (百度文心)
+    let aiContent = '（AI 回复需要配置 Edge Function）'
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-generation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+        body: JSON.stringify({ messages: [{ role: 'user', content }] }),
+      })
+      const json = await resp.json()
+      aiContent = json.choices?.[0]?.message?.content || aiContent
+    } catch { /* 忽略 AI 调用失败 */ }
+    const { data: aiMsg } = await supabase.from('ai_messages').insert({
+      conversation_id: convId, role: 'assistant', content: aiContent, model: 'ernie-bot',
+    }).select().single()
+    set(s => ({
+      aiMessages: { ...s.aiMessages, [convId]: [...(s.aiMessages[convId] || []), userMsg, aiMsg].filter(Boolean) },
+      aiConversations: s.aiConversations.map(c => c.id === convId ? { ...c, updated_at: new Date().toISOString() } : c),
+    }))
+  },
+  deleteAIConv: async (id) => {
+    await supabase.from('ai_conversations').delete().eq('id', id)
+    set(s => ({
+      aiConversations: s.aiConversations.filter(c => c.id !== id),
+      aiMessages: { ...s.aiMessages, [id]: [] },
+      activeAIConv: s.activeAIConv === id ? (s.aiConversations[0]?.id || null) : s.activeAIConv,
+    }))
+  },
+
+  // ========== Social Media ==========
+  socialAccounts: [],
+  socialPosts: [],
+  trendingTopics: [],
+  fetchSocialAccounts: async () => {
+    const { data } = await supabase.from('social_accounts').select('*').order('created_at')
+    set({ socialAccounts: data || [] })
+  },
+  fetchSocialPosts: async (accountId) => {
+    let query = supabase.from('social_posts').select('*').order('created_at', { ascending: false })
+    if (accountId) query = query.eq('account_id', accountId)
+    const { data } = await query
+    set({ socialPosts: data || [] })
+  },
+  fetchTrendingTopics: async () => {
+    const { data } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
+    set({ trendingTopics: data || [] })
+  },
+  addSocialAccount: async (a) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('social_accounts').insert({ ...a, user_id: user.user.id }).select().single()
+    if (data) set(s => ({ socialAccounts: [data, ...s.socialAccounts] }))
+  },
+  updateSocialAccount: async (id, updates) => {
+    const { data } = await supabase.from('social_accounts').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ socialAccounts: s.socialAccounts.map(a => a.id === id ? data : a) }))
+  },
+  deleteSocialAccount: async (id) => {
+    await supabase.from('social_accounts').delete().eq('id', id)
+    set(s => ({ socialAccounts: s.socialAccounts.filter(a => a.id !== id) }))
+  },
+  addSocialPost: async (p) => {
+    const { data } = await supabase.from('social_posts').insert(p).select().single()
+    if (data) set(s => ({ socialPosts: [data, ...s.socialPosts] }))
+  },
+  updateSocialPost: async (id, updates) => {
+    const { data } = await supabase.from('social_posts').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ socialPosts: s.socialPosts.map(p => p.id === id ? data : p) }))
+  },
+  deleteSocialPost: async (id) => {
+    await supabase.from('social_posts').delete().eq('id', id)
+    set(s => ({ socialPosts: s.socialPosts.filter(p => p.id !== id) }))
+  },
+
+  // ========== Video Conference ==========
+  conferences: [],
+  fetchConferences: async () => {
+    const { data } = await supabase.from('video_conferences').select('*').order('created_at', { ascending: false })
+    set({ conferences: data || [] })
+  },
+  addConference: async (c) => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const meetingId = 'meet-' + crypto.randomUUID().slice(0, 8)
+    const { data } = await supabase.from('video_conferences').insert({
+      ...c, host_id: user.user.id, meeting_id: meetingId,
+    }).select().single()
+    if (data) set(s => ({ conferences: [data, ...s.conferences] }))
+  },
+  updateConference: async (id, updates) => {
+    const { data } = await supabase.from('video_conferences').update(updates).eq('id', id).select().single()
+    if (data) set(s => ({ conferences: s.conferences.map(c => c.id === id ? data : c) }))
+  },
+  deleteConference: async (id) => {
+    await supabase.from('video_conferences').delete().eq('id', id)
+    set(s => ({ conferences: s.conferences.filter(c => c.id !== id) }))
+  },
+
+  // ========== Notifications ==========
+  notifications: [],
+  fetchNotifications: async () => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    const { data } = await supabase.from('notifications').select('*').eq('user_id', user.user.id).order('created_at', { ascending: false })
+    set({ notifications: data || [] })
+  },
+  markNotificationRead: async (id) => {
+    await supabase.from('notifications').update({ read: true }).eq('id', id)
+    set(s => ({ notifications: s.notifications.map(n => n.id === id ? { ...n, read: true } : n) }))
+  },
+  markAllNotificationsRead: async () => {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) return
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.user.id).eq('read', false)
+    set(s => ({ notifications: s.notifications.map(n => ({ ...n, read: true })) }))
+  },
+
+  // ========== Files ==========
+  files: [],
+  fetchFiles: async (projectId) => {
+    let query = supabase.from('files').select('*').order('created_at', { ascending: false })
+    if (projectId) query = query.eq('project_id', projectId)
+    const { data } = await query
+    set({ files: data || [] })
+  },
+}))
+
+// 初始化：监听认证状态变化
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    useStore.getState().loadUser()
+  }
+  if (event === 'SIGNED_OUT') {
+    useStore.getState().signOut()
+  }
+})

@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Bot, LayoutDashboard, FolderOpen, MessageSquare, Contact, Share2,
   Video, Settings, Search, Bell, ChevronLeft, ChevronRight, LogOut,
-  Moon, Menu, X, Sparkles, KanbanSquare, Shield
+  Moon, Menu, X, Sparkles, KanbanSquare
 } from 'lucide-react'
 import { useStore } from '@/store'
 
@@ -20,7 +20,6 @@ const navItems = [
   { path: '/social-media', label: '自媒体运营', icon: Share2 },
   { path: '/video-conference', label: '视频会议', icon: Video },
   { path: '/settings', label: '系统设置', icon: Settings },
-  { path: '/admin', label: '管理后台', icon: Shield },
 ]
 
 export default function MainLayout() {
