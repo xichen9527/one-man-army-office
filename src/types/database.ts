@@ -349,6 +349,7 @@ export interface DBFile {
   file_size: number | null
   mime_type: string | null
   project_id: string | null
+  task_id: string | null
   uploaded_by: string | null
   is_public: boolean
   metadata: Json

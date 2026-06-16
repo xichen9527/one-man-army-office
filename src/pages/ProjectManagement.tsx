@@ -140,7 +140,7 @@ export default function ProjectManagement() {
     addTask, updateTask, deleteTask,
     addProject, updateProject, deleteProject,
     addDocument, updateDocument, deleteDocument,
-    uploadFile, deleteFile,
+    uploadFile, deleteFile, moveFile,
   } = useStore()
 
   // ========== Tab State ==========
@@ -240,6 +240,23 @@ export default function ProjectManagement() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+
+  // Move file dialog state
+  const [showMoveDialog, setShowMoveDialog] = useState(false)
+  const [moveTargetFile, setMoveTargetFile] = useState<DBFile | null>(null)
+  const [moveSelectedProjectId, setMoveSelectedProjectId] = useState('')
+  const [moveSelectedTaskId, setMoveSelectedTaskId] = useState('')
+
+  // Handle move file
+  const handleMoveFile = useCallback(async () => {
+    if (!moveTargetFile) return
+    await moveFile(moveTargetFile.id, moveSelectedProjectId || null, moveSelectedTaskId || null)
+    setShowMoveDialog(false)
+    setMoveTargetFile(null)
+    setMoveSelectedProjectId('')
+    setMoveSelectedTaskId('')
+    fetchFiles(moveSelectedProjectId || undefined)
+  }, [moveTargetFile, moveSelectedProjectId, moveSelectedTaskId, moveFile, fetchFiles])
 
   // ========== Refs ==========
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -494,7 +511,7 @@ export default function ProjectManagement() {
     for (let i = 0; i < filesArr.length; i++) {
       const pct = Math.round(((i) / filesArr.length) * 100)
       setUploadProgress(pct)
-      await uploadFile(filesArr[i], undefined, (p) => {
+      await uploadFile(filesArr[i], undefined, undefined, (p) => {
         setUploadProgress(Math.round(((i + p / 100) / filesArr.length) * 100))
       })
     }
@@ -1374,6 +1391,9 @@ export default function ProjectManagement() {
                           </div>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setMoveTargetFile(file); setShowMoveDialog(true) }}>
+                            <FolderOpen className="w-4 h-4" />
+                          </Button>
                           {isImg && (
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setImagePreview(file)}>
                               <Eye className="w-4 h-4" />
@@ -1412,6 +1432,10 @@ export default function ProjectManagement() {
                         </div>
                         <div className="mt-2 flex items-start justify-between gap-1">
                           <p className="text-xs font-medium truncate flex-1" title={file.name}>{file.name}</p>
+                          <button onClick={() => { setMoveTargetFile(file); setShowMoveDialog(true) }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500 shrink-0">
+                            <FolderOpen className="w-3 h-3" />
+                          </button>
                           <button onClick={() => deleteFile(file.id)}
                             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 shrink-0">
                             <Trash2 className="w-3 h-3" />
@@ -1435,7 +1459,42 @@ export default function ProjectManagement() {
               )}
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        {/* Move File Dialog */}
+        <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>移动文件</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-gray-500">将「{moveTargetFile?.name}」移动到：</p>
+              <div className="space-y-2">
+                <Label>选择目标项目</Label>
+                <select value={moveSelectedProjectId} onChange={e => { setMoveSelectedProjectId(e.target.value); setMoveSelectedTaskId('') }}
+                  className="w-full border rounded px-3 py-2 text-sm">
+                  <option value="">-- 不选择项目 --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              {moveSelectedProjectId && (
+                <div className="space-y-2">
+                  <Label>选择目标任务（可选）</Label>
+                  <select value={moveSelectedTaskId} onChange={e => setMoveSelectedTaskId(e.target.value)}
+                    className="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- 不选择任务 --</option>
+                    {tasks.filter(t => t.project_id === moveSelectedProjectId).map(t => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowMoveDialog(false)}>取消</Button>
+              <Button onClick={handleMoveFile}>确认移动</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </TabsContent>
 
       </Tabs>
     </div>
