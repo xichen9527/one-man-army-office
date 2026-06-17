@@ -8,7 +8,7 @@ export interface Database {
       projects: { Row: Project; Insert: ProjectInsert; Update: ProjectUpdate }
       tasks: { Row: Task; Insert: TaskInsert; Update: TaskUpdate }
       documents: { Row: Document; Insert: DocumentInsert; Update: DocumentUpdate }
-      channel_id: { Row: Channel; Insert: ChannelInsert; Update: ChannelUpdate }
+      channels: { Row: Channel; Insert: ChannelInsert; Update: ChannelUpdate }
       messages: { Row: Message; Insert: MessageInsert; Update: MessageUpdate }
       notifications: { Row: Notification; Insert: NotificationInsert; Update: NotificationUpdate }
       ai_conversations: { Row: AIConversation; Insert: AIConversationInsert; Update: AIConversationUpdate }
@@ -16,7 +16,7 @@ export interface Database {
       customers: { Row: Customer; Insert: CustomerInsert; Update: CustomerUpdate }
       sales_opportunities: { Row: SalesOpportunity; Insert: SalesOpportunityInsert; Update: SalesOpportunityUpdate }
       social_accounts: { Row: SocialAccount; Insert: SocialAccountInsert; Update: SocialAccountUpdate }
-      social_posts: { Row: SocialPost; Insert: SocialPostInsert; Update: SocialPostUpdate }
+      social_media_posts: { Row: SocialPost; Insert: SocialPostInsert; Update: SocialPostUpdate }
       social_post_platforms: { Row: SocialPostPlatform; Insert: SocialPostPlatformInsert; Update: SocialPostPlatformUpdate }
       trending_topics: { Row: TrendingTopic; Insert: TrendingTopicInsert; Update: TrendingTopicUpdate }
       video_conferences: { Row: Conference; Insert: ConferenceInsert; Update: ConferenceUpdate }

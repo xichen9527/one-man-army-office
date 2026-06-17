@@ -852,7 +852,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   fetchSocialPosts: async (accountId) => {
     try {
-      let query = supabase.from('social_posts').select('*').order('created_at', { ascending: false })
+      let query = supabase.from('social_media_posts').select('*').order('created_at', { ascending: false })
       if (accountId) query = query.eq('account_id', accountId)
       const { data, error } = await query
       if (error) { console.error('fetchSocialPosts failed:', error); return }
@@ -934,19 +934,19 @@ export const useStore = create<AppState>((set, get) => ({
   },
   addSocialPost: async (p) => {
     try {
-      const { data } = await supabase.from('social_posts').insert(p as any).select().single()
+      const { data } = await supabase.from('social_media_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
     } catch (e) { console.error('addSocialPost failed:', e) }
   },
   updateSocialPost: async (id, updates) => {
     try {
-      const { data } = await supabase.from('social_posts').update(updates as any).eq('id', id).select().single()
+      const { data } = await supabase.from('social_media_posts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialPosts: s.socialPosts.map((p: SocialPost) => p.id === id ? data as SocialPost : p) }))
     } catch (e) { console.error('updateSocialPost failed:', e) }
   },
   deleteSocialPost: async (id) => {
     try {
-      await supabase.from('social_posts').delete().eq('id', id)
+      await supabase.from('social_media_posts').delete().eq('id', id)
       set((s) => ({ socialPosts: s.socialPosts.filter((p: SocialPost) => p.id !== id) }))
     } catch (e) { console.error('deleteSocialPost failed:', e) }
   },
