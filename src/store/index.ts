@@ -14,6 +14,7 @@ import type {
   SalesOpportunity, SalesOpportunityInsert, SalesOpportunityUpdate,
   SocialAccount, SocialAccountInsert, SocialAccountUpdate,
   SocialPost, SocialPostInsert, SocialPostUpdate,
+  SocialPostPlatform, SocialPostPlatformInsert, SocialPostPlatformUpdate,
   TrendingTopic, TrendingTopicInsert, TrendingTopicUpdate,
   Conference, ConferenceInsert, ConferenceUpdate,
   TeamMember, TeamMemberInsert, TeamMemberUpdate,
@@ -49,7 +50,7 @@ interface AppState {
 
   // Documents
   documents: Document[]
-  fetchDocuments: (projectId?: string) => Promise<void>
+  fetchDocuments: (projectId?: string, taskId?: string) => Promise<void>
   addDocument: (d: Omit<DocumentInsert, 'creator_id'>) => Promise<void>
   updateDocument: (id: string, updates: DocumentUpdate) => Promise<void>
   deleteDocument: (id: string) => Promise<void>
@@ -111,9 +112,11 @@ interface AppState {
   // Social Media
   socialAccounts: SocialAccount[]
   socialPosts: SocialPost[]
+  socialPostPlatforms: SocialPostPlatform[]
   trendingTopics: TrendingTopic[]
   fetchSocialAccounts: () => Promise<void>
   fetchSocialPosts: (accountId?: string) => Promise<void>
+  fetchSocialPostPlatforms: (postId?: string) => Promise<void>
   fetchTrendingTopics: () => Promise<void>
   addSocialAccount: (a: Omit<SocialAccountInsert, 'user_id'>) => Promise<void>
   updateSocialAccount: (id: string, updates: SocialAccountUpdate) => Promise<void>
@@ -122,6 +125,9 @@ interface AppState {
   addSocialPost: (p: SocialPostInsert) => Promise<void>
   updateSocialPost: (id: string, updates: SocialPostUpdate) => Promise<void>
   deleteSocialPost: (id: string) => Promise<void>
+  addSocialPostPlatform: (pp: SocialPostPlatformInsert) => Promise<void>
+  updateSocialPostPlatform: (id: string, updates: SocialPostPlatformUpdate) => Promise<void>
+  deleteSocialPostPlatform: (id: string) => Promise<void>
   initiateOAuth: (accountId: string, platform: string) => Promise<{ auth_url?: string; error?: string; needs_credentials?: boolean }>
   publishPost: (postId: string, accountId: string, content: string, title?: string, platform?: string) => Promise<{ success: boolean; error?: string; post_url?: string; post_id?: string }>
 
@@ -140,7 +146,7 @@ interface AppState {
 
   // Files
   files: DBFile[]
-  fetchFiles: (projectId?: string) => Promise<void>
+  fetchFiles: (projectId?: string, taskId?: string) => Promise<void>
   uploadFile: (file: File, projectId?: string, taskId?: string, onProgress?: (pct: number) => void) => Promise<DBFile | null>
   moveFile: (fileId: string, newProjectId?: string, newTaskId?: string) => Promise<void>
   deleteFile: (id: string) => Promise<void>
@@ -179,6 +185,7 @@ export const useStore = create<AppState>((set, get) => ({
         get().fetchSalesOpportunities()
         get().fetchSocialAccounts()
         get().fetchSocialPosts()
+        get().fetchSocialPostPlatforms()
         get().fetchConferences()
         get().fetchAIConversations()
         get().fetchTeamMembers()
@@ -220,7 +227,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       currentUser: null, isAuthenticated: false,
       projects: [], tasks: [], documents: [], channels: [], messages: {},
-      notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [],
+      notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [], socialPostPlatforms: [],
       conferences: [], customers: [], salesOpportunities: [], members: [], invitations: [], files: [],
     })
   },
@@ -299,12 +306,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ========== Documents ==========
   documents: [],
-  fetchDocuments: async (projectId) => {
+  fetchDocuments: async (projectId?, taskId?) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      let query = supabase.from('documents').select('*').or(`creator_id.eq.${user.user.id},owner_id.eq.${user.user.id}`).order('updated_at', { ascending: false })
+      let query = supabase.from('documents').select('*').or(`creator_id.eq.${user.user.id}`).order('updated_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
+      if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
       if (error) { console.error('fetchDocuments failed:', error); return }
       set({ documents: (data as Document[] | null) || [] })
@@ -339,13 +347,16 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data, error } = await supabase.from('channels').select('*').or(`owner_id.eq.${user.user.id},is_public.eq.true`).order('created_at')
-      if (error) { console.error('fetchChannels failed:', error); return }
-      set({ channels: (data as Channel[] | null) || [] })
+      const { data, error } = await supabase.from('channels').select('*').or(`created_by.eq.${user.user.id}`).eq('is_public', false).order('created_at')
+      const { data: publicData, error: publicError } = await supabase.from('channels').select('*').eq('is_public', true).order('created_at')
+      const allData = [...(data || []), ...((publicData || [])).filter(p => !(data || []).some(c => c.id === p.id))]
+      const mergedError = error || publicError
+      if (mergedError) { console.error('fetchChannels failed:', mergedError); return }
+      set({ channels: (allData as Channel[] | null) || [] })
       const state = get()
-      if (data && data.length > 0 && !state.activeChannel) {
-        set({ activeChannel: data[0].id })
-        get().fetchMessages(data[0].id)
+      if (allData && allData.length > 0 && !state.activeChannel) {
+        set({ activeChannel: allData[0].id })
+        get().fetchMessages(allData[0].id)
       }
     } catch (e) { console.error('fetchChannels failed:', e) }
   },
@@ -820,6 +831,7 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Social Media ==========
   socialAccounts: [],
   socialPosts: [],
+  socialPostPlatforms: [],
   trendingTopics: [],
   fetchSocialAccounts: async () => {
     try {
@@ -838,6 +850,20 @@ export const useStore = create<AppState>((set, get) => ({
       if (error) { console.error('fetchSocialPosts failed:', error); return }
       set({ socialPosts: (data as SocialPost[] | null) || [] })
     } catch (e) { console.error('fetchSocialPosts failed:', e) }
+  },
+  fetchSocialPostPlatforms: async (postId) => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      let query = supabase.from('social_post_platforms').select(`
+        *,
+        social_accounts!inner(user_id)
+      `).eq('social_accounts.user_id', user.user.id)
+      if (postId) query = query.eq('post_id', postId)
+      const { data, error } = await query
+      if (error) { console.error('fetchSocialPostPlatforms failed:', error); return }
+      set({ socialPostPlatforms: (data as SocialPostPlatform[] | null) || [] })
+    } catch (e) { console.error('fetchSocialPostPlatforms failed:', e) }
   },
   fetchTrendingTopics: async () => {
     try {
@@ -916,6 +942,25 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (e) { console.error('deleteSocialPost failed:', e) }
   },
 
+  addSocialPostPlatform: async (pp) => {
+    try {
+      const { data } = await supabase.from('social_post_platforms').insert(pp as any).select().single()
+      if (data) set((s) => ({ socialPostPlatforms: [data as SocialPostPlatform, ...s.socialPostPlatforms] }))
+    } catch (e) { console.error('addSocialPostPlatform failed:', e) }
+  },
+  updateSocialPostPlatform: async (id, updates) => {
+    try {
+      const { data } = await supabase.from('social_post_platforms').update(updates as any).eq('id', id).select().single()
+      if (data) set((s) => ({ socialPostPlatforms: s.socialPostPlatforms.map((pp: SocialPostPlatform) => pp.id === id ? data as SocialPostPlatform : pp) }))
+    } catch (e) { console.error('updateSocialPostPlatform failed:', e) }
+  },
+  deleteSocialPostPlatform: async (id) => {
+    try {
+      await supabase.from('social_post_platforms').delete().eq('id', id)
+      set((s) => ({ socialPostPlatforms: s.socialPostPlatforms.filter((pp: SocialPostPlatform) => pp.id !== id) }))
+    } catch (e) { console.error('deleteSocialPostPlatform failed:', e) }
+  },
+
   // Open OAuth authorization window for a platform account
   initiateOAuth: async (accountId, platform) => {
     try {
@@ -980,7 +1025,8 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data, error } = await supabase.from('video_conferences').select('*').eq('host_id', user.user.id).order('created_at', { ascending: false })
+      // RLS policy handles filtering: host or participant can see
+      const { data, error } = await supabase.from('video_conferences').select('*').order('created_at', { ascending: false })
       if (error) { console.error('fetchConferences failed:', error); return }
       set({ conferences: (data as Conference[] | null) || [] })
     } catch (e) { console.error('fetchConferences failed:', e) }
@@ -1043,6 +1089,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       let query = supabase.from('files').select('*').eq('uploaded_by', user.user.id).order('created_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
+      if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
       if (error) { console.error('fetchFiles failed:', error); return }
       set({ files: (data as DBFile[] | null) || [] })

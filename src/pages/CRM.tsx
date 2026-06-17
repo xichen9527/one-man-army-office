@@ -251,15 +251,15 @@ export default function CRM() {
     addOpportunity, updateOpportunity,
   } = useStore()
 
-  useEffect(() => {
-    if (selectedCustomer) fetchFollowups(selectedCustomer)
-  }, [selectedCustomer])
-
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'all'>('all')
   const [tagFilter, setTagFilter] = useState<string[]>([])  // 标签多选筛选
   const [viewMode, setViewMode] = useState<'card' | 'table'>('table')
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (selectedCustomer) fetchFollowups(selectedCustomer)
+  }, [selectedCustomer, fetchFollowups])
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [showNewOpp, setShowNewOpp] = useState(false)
   const [detailTab, setDetailTab] = useState<'info' | 'followup'>('info')

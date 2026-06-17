@@ -216,6 +216,14 @@ export default function ProjectManagement() {
   const [docTitle, setDocTitle] = useState('')
   const [docContent, setDocContent] = useState('')
 
+  // Doc creation: project/task selector
+  const [newDocProjectId, setNewDocProjectId] = useState('')
+  const [newDocTaskId, setNewDocTaskId] = useState('')
+
+  // File upload: project/task selector
+  const [uploadProjectId, setUploadProjectId] = useState('')
+  const [uploadTaskId, setUploadTaskId] = useState('')
+
   // ============================================================
   // Error / Feedback State (global, shared across tabs)
   // ============================================================
@@ -386,6 +394,14 @@ export default function ProjectManagement() {
   }, [documents, searchQuery, selectedFolder])
 
   // Storage usage
+  const filteredFiles = useMemo(() => {
+    return files.filter(f => {
+      if (uploadProjectId && f.project_id !== uploadProjectId) return false
+      if (uploadTaskId && f.task_id !== uploadTaskId) return false
+      return true
+    })
+  }, [files, uploadProjectId, uploadTaskId])
+
   const storageUsage = useMemo(() => {
     const totalFiles = files.length
     const totalSize = files.reduce((sum, file) => sum + (file.file_size || 0), 0)
@@ -511,14 +527,15 @@ export default function ProjectManagement() {
     for (let i = 0; i < filesArr.length; i++) {
       const pct = Math.round(((i) / filesArr.length) * 100)
       setUploadProgress(pct)
-      await uploadFile(filesArr[i], undefined, undefined, (p) => {
+      await uploadFile(filesArr[i], uploadProjectId || undefined, uploadTaskId || undefined, (p) => {
         setUploadProgress(Math.round(((i + p / 100) / filesArr.length) * 100))
       })
     }
+    fetchFiles(uploadProjectId || undefined)
     setUploading(false)
     setUploadProgress(100)
     setTimeout(() => setUploadProgress(0), 1000)
-  }, [uploadFile])
+  }, [uploadFile, uploadProjectId, uploadTaskId, fetchFiles])
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false) }, [])
@@ -1216,6 +1233,7 @@ export default function ProjectManagement() {
                             <div className="flex items-center gap-2 mt-3">
                               <Badge variant="outline" className="text-[10px]">{doc.type}</Badge>
                               {proj && <span className="text-[10px] text-gray-400">{proj.name}</span>}
+                              {doc.task_id && (() => { const t = tasks.find(t => t.id === doc.task_id); return t ? <span className="text-[10px] text-blue-400">📋 {t.title}</span> : null })()}
                               {doc.is_public && <Badge variant="secondary" className="text-[10px] bg-green-50 text-green-600">公开</Badge>}
                             </div>
                             <p className="text-[10px] text-gray-400 mt-2">更新于 {new Date(doc.updated_at).toLocaleDateString()}</p>
@@ -1241,6 +1259,28 @@ export default function ProjectManagement() {
                   <div>
                     <Label>文档标题</Label>
                     <Input value={newDocTitle} onChange={e => setNewDocTitle(e.target.value)} placeholder="输入文档标题" autoFocus />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">关联项目（可选）</Label>
+                      <select value={newDocProjectId} onChange={e => { setNewDocProjectId(e.target.value); setNewDocTaskId('') }}
+                        className="w-full border rounded px-2 py-1.5 text-sm">
+                        <option value="">-- 不选择项目 --</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    {newDocProjectId && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">关联任务（可选）</Label>
+                        <select value={newDocTaskId} onChange={e => setNewDocTaskId(e.target.value)}
+                          className="w-full border rounded px-2 py-1.5 text-sm">
+                          <option value="">-- 不选择任务 --</option>
+                          {tasks.filter(t => t.project_id === newDocProjectId).map(t => (
+                            <option key={t.id} value={t.id}>{t.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label>模板</Label>
@@ -1268,7 +1308,12 @@ export default function ProjectManagement() {
                       clearFeedback()
                       try {
                         const template = selectedTemplate === 'blank' ? newDocContent : (selectedTemplate === 'meeting' ? '# 会议主题\n\n## 参会人员\n\n## 议程\n\n## 决议\n\n' + newDocContent : selectedTemplate === 'report' ? '# 报告标题\n\n## 摘要\n\n## 详情\n\n' + newDocContent : selectedTemplate === 'proposal' ? '# 方案标题\n\n## 背景\n\n## 方案\n\n## 预期效果\n\n' + newDocContent : newDocContent)
-                        await addDocument({ title: newDocTitle.trim(), content: template })
+                        await addDocument({
+                          title: newDocTitle.trim(),
+                          content: template,
+                          project_id: newDocProjectId || null,
+                          task_id: newDocTaskId || null,
+                        })
                         setShowNewDoc(false)
                         setNewDocTitle('')
                         setNewDocContent('')
@@ -1311,7 +1356,30 @@ export default function ProjectManagement() {
 
           {/* Upload Zone */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 space-y-4">
+              {/* Project/Task selectors for upload */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm text-gray-500 shrink-0">上传到：</span>
+                <select value={uploadProjectId} onChange={e => { setUploadProjectId(e.target.value); setUploadTaskId('') }}
+                  className="border rounded px-2 py-1.5 text-sm">
+                  <option value="">-- 不选择项目 --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                {uploadProjectId && (
+                  <select value={uploadTaskId} onChange={e => setUploadTaskId(e.target.value)}
+                    className="border rounded px-2 py-1.5 text-sm">
+                    <option value="">-- 不选择任务 --</option>
+                    {tasks.filter(t => t.project_id === uploadProjectId).map(t => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </select>
+                )}
+                {(uploadProjectId || uploadTaskId) && (
+                  <button onClick={() => { setUploadProjectId(''); setUploadTaskId('') }}
+                    className="text-xs text-gray-400 hover:text-gray-600 ml-1">清除</button>
+                )}
+              </div>
+
               <div
                 ref={dropRef}
                 onDragOver={handleDragOver}
@@ -1326,7 +1394,11 @@ export default function ProjectManagement() {
                 <p className={`font-medium transition-colors ${isDragging ? 'text-blue-600' : 'text-gray-600'}`}>
                   {isDragging ? '放开以上传文件' : '拖拽文件到此处上传'}
                 </p>
-                <p className="text-sm text-gray-400 mt-1">或点击选择文件（支持所有常见格式）</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {uploadProjectId
+                    ? `将上传到「${projects.find(p => p.id === uploadProjectId)?.name}」${uploadTaskId ? `→「${tasks.find(t => t.id === uploadTaskId)?.title}」` : ''}`
+                    : '点击选择文件（支持所有常见格式）'}
+                </p>
                 <Button variant="outline" size="sm" className="mt-4" onClick={e => e.stopPropagation()}>
                   选择文件
                 </Button>
@@ -1356,17 +1428,40 @@ export default function ProjectManagement() {
           {/* File List/Grid */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">文件列表 ({files.length})</CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base">文件列表 ({filteredFiles.length})</CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-400">筛选：</span>
+                  <select value={uploadProjectId} onChange={e => { setUploadProjectId(e.target.value); setUploadTaskId('') }}
+                    className="border rounded px-2 py-1 text-xs">
+                    <option value="">全部项目</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  {uploadProjectId && (
+                    <select value={uploadTaskId} onChange={e => setUploadTaskId(e.target.value)}
+                      className="border rounded px-2 py-1 text-xs">
+                      <option value="">全部任务</option>
+                      {tasks.filter(t => t.project_id === uploadProjectId).map(t => (
+                        <option key={t.id} value={t.id}>{t.title}</option>
+                      ))}
+                    </select>
+                  )}
+                  {(uploadProjectId || uploadTaskId) && (
+                    <button onClick={() => { setUploadProjectId(''); setUploadTaskId('') }}
+                      className="text-xs text-gray-400 hover:text-gray-600">清除筛选</button>
+                  )}
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {files.length === 0 ? (
+              {filteredFiles.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <File className="w-10 h-10 mx-auto mb-2 text-gray-200" />
                   <p className="text-sm">暂无文件</p>
                 </div>
               ) : fileViewMode === 'list' ? (
                 <div className="space-y-2">
-                  {files.map(file => {
+                  {filteredFiles.map(file => {
                     const isImg = isImageFile(file)
                     const publicUrl = file.file_path
                       ? supabase.storage.from('files').getPublicUrl(file.file_path).data.publicUrl

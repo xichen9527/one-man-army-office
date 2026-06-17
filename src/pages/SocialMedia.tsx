@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store'
 import type { SocialPostStatus } from '@/types/database'
-import type { SocialAccount } from '@/types/database'
+import type { SocialAccount, SocialPostPlatform } from '@/types/database'
 import { format, parseISO } from 'date-fns'
 
 const platformIcons: Record<string, { icon: string; color: string; bg: string }> = {
@@ -59,10 +59,11 @@ function highlightHashtags(text: string): React.ReactNode[] {
 
 export default function SocialMedia() {
   const {
-    socialAccounts, socialPosts, trendingTopics, currentUser,
+    socialAccounts, socialPosts, socialPostPlatforms, trendingTopics, currentUser,
     addSocialAccount, updateSocialAccount, deleteSocialAccount,
     initiateOAuth, publishPost,
     addSocialPost, updateSocialPost, deleteSocialPost,
+    addSocialPostPlatform, updateSocialPostPlatform, deleteSocialPostPlatform,
     syncSocialAccount,
   } = useStore()
 
@@ -86,7 +87,8 @@ export default function SocialMedia() {
   const [af, setAf] = useState({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
 
   // Post form
-  const [pf, setPf] = useState({ title: '', content: '', platform: 'weibo', account_id: '' })
+  const [pf, setPf] = useState({ title: '', content: '', account_id: '' })
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]) // 多选平台
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduledTime, setScheduledTime] = useState('')
 
@@ -225,71 +227,94 @@ export default function SocialMedia() {
     setAf({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
   }
 
-  const charLimit = platformCharLimits[pf.platform] ?? defaultCharLimit
+  const getCharLimit = (platform: string) => platformCharLimits[platform] ?? defaultCharLimit
   const charCount = pf.content.length
-  const overLimit = charCount > charLimit
+  const overLimit = selectedPlatforms.length > 0 && selectedPlatforms.some(p => charCount > getCharLimit(p))
 
-  const handleCreatePost = (status?: SocialPostStatus, scheduledAt?: string | null) => {
-    if (!pf.content.trim()) return
-    addSocialPost({
-      account_id: pf.account_id || socialAccounts[0]?.id || 'acc-001',
+  const handleCreatePost = async (status?: SocialPostStatus, scheduledAt?: string | null) => {
+    if (!pf.content.trim() || selectedPlatforms.length === 0) return
+
+    // 创建内容
+    const post = await addSocialPost({
       title: pf.title,
       content: pf.content,
-      platform: pf.platform,
+      platform: null, // 已废弃
       status: status || 'draft',
       likes: 0, comments: 0, shares: 0, views: 0,
       scheduled_at: scheduledAt || null,
       published_at: scheduledAt ? null : new Date().toISOString(),
     })
+
+    // 为每个选中的平台创建关联记录
+    for (const platform of selectedPlatforms) {
+      const account = socialAccounts.find(a => a.platform === platform)
+      if (account) {
+        await addSocialPostPlatform({
+          post_id: (socialPosts[0]?.id || ''),
+          account_id: account.id,
+          platform: platform as any,
+          status: status || 'draft',
+          scheduled_at: scheduledAt || null,
+          published_at: null,
+        })
+      }
+    }
+
     setShowNewPost(false)
-    setPf({ title: '', content: '', platform: 'weibo', account_id: '' })
+    setPf({ title: '', content: '', account_id: '' })
+    setSelectedPlatforms([])
     setScheduleEnabled(false)
     setScheduledTime('')
   }
 
   const handlePublishDirect = async () => {
-    if (!pf.content.trim()) return
-    const accountId = pf.account_id || socialAccounts[0]?.id
-    if (!accountId) {
-      setPublishError('请先绑定一个社交账号')
-      return
-    }
-    const acc = socialAccounts.find(a => a.id === accountId)
-    if (!acc?.access_token) {
-      setPublishError(`${platformNames[acc?.platform || 'weibo']} 未完成授权连接，请先点击「连接平台」完成OAuth授权`)
-      return
-    }
-    // Step 1: Create post as draft in DB
+    if (!pf.content.trim() || selectedPlatforms.length === 0) return
+
+    // 创建内容
     await addSocialPost({
-      account_id: accountId,
       title: pf.title,
       content: pf.content,
-      platform: pf.platform,
+      platform: null,
       status: 'draft',
       likes: 0, comments: 0, shares: 0, views: 0,
       scheduled_at: null,
       published_at: null,
     })
-    // Step 2: Find the just-created post (most recent for this account)
-    const newPost = socialPosts.find(p => p.account_id === accountId)
-    if (!newPost) { setPublishError('发布失败：无法创建草稿'); return }
-    // Step 3: Publish to platform
-    setPublishError(null)
-    setPublishSuccess(null)
-    const result = await publishPost(newPost.id, accountId, pf.content, pf.title || undefined, pf.platform)
-    if (result.success) {
-      setPublishSuccess(result.post_url || `${platformNames[pf.platform]} 发布成功！`)
-    } else {
-      setPublishError(result.error || '发布失败，请重试')
+
+    // 获取刚创建的内容
+    const newPost = socialPosts.find(p => p.content === pf.content)
+    if (!newPost) { setPublishError('发布失败：无法创建内容'); return }
+
+    // 发布到选中的每个平台
+    for (const platform of selectedPlatforms) {
+      const account = socialAccounts.find(a => a.platform === platform)
+      if (!account) continue
+
+      if (!account.access_token) {
+        setPublishError(`${platformNames[platform]} 未完成授权连接，请先点击「连接平台」完成OAuth授权`)
+        continue
+      }
+
+      setPublishError(null)
+      setPublishSuccess(null)
+      const result = await publishPost(newPost.id, account.id, pf.content, pf.title || undefined, platform)
+      if (result.success) {
+        setPublishSuccess(result.post_url || `${platformNames[platform]} 发布成功！`)
+      } else {
+        setPublishError(result.error || `${platformNames[platform]} 发布失败`)
+      }
     }
+
     setShowNewPost(false)
-    setPf({ title: '', content: '', platform: 'weibo', account_id: '' })
+    setPf({ title: '', content: '', account_id: '' })
+    setSelectedPlatforms([])
     setScheduleEnabled(false)
     setScheduledTime('')
   }
 
   const handleWriteFromTrending = (topicTitle: string) => {
-    setPf({ title: '', content: `#${topicTitle}`, platform: 'weibo', account_id: '' })
+    setPf({ title: '', content: `#${topicTitle}`, account_id: '' })
+    setSelectedPlatforms(['weibo']) // 默认选择微博
     setActiveTab('content')
     setShowNewPost(true)
   }
@@ -402,14 +427,30 @@ export default function SocialMedia() {
 
           <div className="grid gap-3 md:grid-cols-2">
             {filteredPosts.map(post => {
-              const pi = platformIcons[post.platform] || { icon: post.platform, color: 'text-gray-500', bg: 'bg-gray-50' }
+              // 获取该内容关联的所有平台
+              const postPlatforms = socialPostPlatforms.filter(pp => pp.post_id === post.id)
+              const pi = platformIcons[post.platform || 'weibo'] || { icon: post.platform || '未知', color: 'text-gray-500', bg: 'bg-gray-50' }
               return (
                 <Card key={post.id} className="hover:shadow-md transition-shadow cursor-pointer group" onClick={() => setShowPostDetail(post.id)}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${pi.bg} ${pi.color} font-medium`}>{pi.icon}</span>
+                          {/* 显示所有关联的平台 */}
+                          <div className="flex gap-1 flex-wrap">
+                            {postPlatforms.length > 0 ? (
+                              postPlatforms.map(pp => {
+                                const ppi = platformIcons[pp.platform] || { icon: pp.platform, color: 'text-gray-500', bg: 'bg-gray-50' }
+                                return (
+                                  <span key={pp.id} className={`text-xs px-1.5 py-0.5 rounded ${ppi.bg} ${ppi.color} font-medium`}>
+                                    {ppi.icon}
+                                  </span>
+                                )
+                              })
+                            ) : (
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${pi.bg} ${pi.color} font-medium`}>{pi.icon}</span>
+                            )}
+                          </div>
                           {post.title && <span className="text-sm font-medium truncate">{post.title}</span>}
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{post.content}</p>
@@ -664,18 +705,102 @@ export default function SocialMedia() {
                 className="w-full min-h-[150px] border rounded-md p-3 text-sm resize-y outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
               <div className="absolute bottom-2 left-3 pointer-events-none text-sm whitespace-pre-wrap break-all opacity-0 max-h-0 overflow-hidden">{highlightHashtags(pf.content)}</div>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-400">{pf.platform === 'weibo' ? '微博' : pf.platform === 'wechat' ? '微信' : pf.platform === 'xiaohongshu' ? '小红书' : '当前平台'}字数限制：{charLimit}</span>
-              <span className={overLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>{charCount}/{charLimit}{overLimit ? ' ⚠️ 超出限制' : ''}</span>
+            
+            {/* 字数限制提示 */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-400 font-medium">目标平台字数限制：</span>
+                <span className={overLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>{charCount} 字</span>
+              </div>
+              {selectedPlatforms.length > 0 ? (
+                <div className="grid grid-cols-2 gap-1 text-xs">
+                  {selectedPlatforms.map(p => {
+                    const limit = getCharLimit(p)
+                    const exceeded = charCount > limit
+                    return (
+                      <div key={p} className={`flex items-center gap-1 ${exceeded ? 'text-red-500' : 'text-gray-400'}`}>
+                        <span>{platformNames[p]}</span>
+                        <span className={exceeded ? 'font-medium' : ''}>{charCount}/{limit}</span>
+                        {exceeded && <span>⚠️</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-500">请选择至少一个目标平台</p>
+              )}
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {Object.entries(platformIcons).map(([key, val]) => (
-                <button key={key} onClick={() => setPf({ ...pf, platform: key })}
-                  className={`p-2 rounded-lg border text-xs font-medium transition-colors ${pf.platform === key ? 'border-blue-500 bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-600'}`}>
-                  {val.icon}
-                </button>
-              ))}
+
+            {/* 平台选择（支持多选）*/}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">目标平台 *</span>
+                <span className="text-xs text-gray-400">已选 {selectedPlatforms.length} 个</span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {Object.entries(platformIcons).map(([key, val]) => {
+                  const isSelected = selectedPlatforms.includes(key)
+                  const account = socialAccounts.find(a => a.platform === key)
+                  const hasAccount = !!account
+                  const isConnectedAcc = hasAccount && isConnected(account)
+                  return (
+                    <button 
+                      key={key} 
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedPlatforms(selectedPlatforms.filter(p => p !== key))
+                        } else {
+                          setSelectedPlatforms([...selectedPlatforms, key])
+                        }
+                      }}
+                      disabled={!hasAccount}
+                      className={`p-2 rounded-lg border text-xs font-medium transition-colors relative ${
+                        isSelected 
+                          ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                          : hasAccount
+                            ? 'hover:bg-gray-50 text-gray-600'
+                            : 'opacity-40 cursor-not-allowed text-gray-400'
+                      }`}
+                      title={!hasAccount ? '请先绑定该平台账号' : !isConnectedAcc ? '建议先连接平台' : ''}
+                    >
+                      {val.icon}
+                      {isConnectedAcc && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-500" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {selectedPlatforms.length === 0 && (
+                <p className="text-xs text-amber-500">请至少选择一个目标平台</p>
+              )}
             </div>
+
+            {/* 平台内容格式提示 */}
+            {selectedPlatforms.length > 0 && (
+              <div className="bg-blue-50 rounded-lg p-3 text-xs space-y-1">
+                <p className="font-medium text-blue-700">平台内容提示：</p>
+                <ul className="text-blue-600 space-y-0.5">
+                  {selectedPlatforms.includes('weibo') && (
+                    <li>• 微博：限 {platformCharLimits.weibo} 字，支持图片和视频</li>
+                  )}
+                  {selectedPlatforms.includes('wechat') && (
+                    <li>• 微信公众号：推荐图文格式，支持长文</li>
+                  )}
+                  {selectedPlatforms.includes('douyin') && (
+                    <li>• 抖音：需上传视频，文案建议简洁</li>
+                  )}
+                  {selectedPlatforms.includes('xiaohongshu') && (
+                    <li>• 小红书：推荐图文形式，重视标题和封面</li>
+                  )}
+                  {selectedPlatforms.includes('bilibili') && (
+                    <li>• B站：需上传视频，标题和封面很重要</li>
+                  )}
+                  {selectedPlatforms.includes('zhihu') && (
+                    <li>• 知乎：适合长文回答或专栏文章</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={scheduleEnabled} onCheckedChange={v => setScheduleEnabled(v)} />
               定时发布
@@ -699,11 +824,11 @@ export default function SocialMedia() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowNewPost(false); setPublishError(null); setPublishSuccess(null) }}>取消</Button>
-            <Button onClick={() => handleCreatePost('draft')} disabled={!pf.content.trim()}>保存草稿</Button>
+            <Button onClick={() => handleCreatePost('draft')} disabled={!pf.content.trim() || selectedPlatforms.length === 0}>保存草稿</Button>
             {scheduleEnabled && scheduledTime ? (
-              <Button onClick={() => handleCreatePost('scheduled', new Date(scheduledTime).toISOString())} disabled={!pf.content.trim() || overLimit} className="bg-amber-600 hover:bg-amber-700">定时发布</Button>
+              <Button onClick={() => handleCreatePost('scheduled', new Date(scheduledTime).toISOString())} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit} className="bg-amber-600 hover:bg-amber-700">定时发布</Button>
             ) : (
-              <Button onClick={() => handlePublishDirect()} disabled={!pf.content.trim() || overLimit || publishingIds.size > 0} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => handlePublishDirect()} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit || publishingIds.size > 0} className="bg-blue-600 hover:bg-blue-700">
                 {publishingIds.size > 0 ? '发布中...' : '立即发布'}
               </Button>
             )}

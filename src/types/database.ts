@@ -17,6 +17,7 @@ export interface Database {
       sales_opportunities: { Row: SalesOpportunity; Insert: SalesOpportunityInsert; Update: SalesOpportunityUpdate }
       social_accounts: { Row: SocialAccount; Insert: SocialAccountInsert; Update: SocialAccountUpdate }
       social_posts: { Row: SocialPost; Insert: SocialPostInsert; Update: SocialPostUpdate }
+      social_post_platforms: { Row: SocialPostPlatform; Insert: SocialPostPlatformInsert; Update: SocialPostPlatformUpdate }
       trending_topics: { Row: TrendingTopic; Insert: TrendingTopicInsert; Update: TrendingTopicUpdate }
       video_conferences: { Row: Conference; Insert: ConferenceInsert; Update: ConferenceUpdate }
       team_members: { Row: TeamMember; Insert: TeamMemberInsert; Update: TeamMemberUpdate }
@@ -254,10 +255,10 @@ export type SocialAccountUpdate = Partial<Omit<SocialAccount, 'id' | 'user_id' |
 
 export interface SocialPost {
   id: string
-  account_id: string
+  account_id: string | null
   title: string | null
   content: string
-  platform: string
+  platform: string | null // 已废弃：请使用 social_post_platforms 关联表
   status: 'draft' | 'scheduled' | 'published' | 'failed'
   scheduled_at: string | null
   published_at: string | null
@@ -274,6 +275,25 @@ export interface SocialPost {
 }
 export type SocialPostInsert = Omit<SocialPost, 'id' | 'created_at' | 'updated_at'>
 export type SocialPostUpdate = Partial<Omit<SocialPost, 'id' | 'account_id' | 'created_at' | 'updated_at'>>
+
+// 内容-平台关联表：一条内容可发布到多个平台
+export interface SocialPostPlatform {
+  id: string
+  post_id: string
+  account_id: string
+  platform: 'weibo' | 'wechat' | 'douyin' | 'xiaohongshu' | 'bilibili' | 'zhihu' | 'toutiao' | 'other'
+  status: 'pending' | 'draft' | 'scheduled' | 'published' | 'failed'
+  scheduled_at: string | null
+  published_at: string | null
+  post_url: string | null
+  platform_post_id: string | null // 平台返回的内容ID
+  error_message: string | null
+  metadata: Json
+  created_at: string
+  updated_at: string
+}
+export type SocialPostPlatformInsert = Omit<SocialPostPlatform, 'id' | 'created_at' | 'updated_at'>
+export type SocialPostPlatformUpdate = Partial<Omit<SocialPostPlatform, 'id' | 'post_id' | 'account_id' | 'created_at' | 'updated_at'>>
 
 export interface TrendingTopic {
   id: string
