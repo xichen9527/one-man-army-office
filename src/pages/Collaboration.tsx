@@ -97,42 +97,26 @@ export default function Collaboration() {
   // Scroll to bottom
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [currentMessages.length])
 
-  // ========== Realtime subscription ==========
+  // ========== New message notification (beep + title) ==========
+  // Realtime subscription is handled by store.subscribeToMessages
+  // Here we only detect new messages from OTHER users and play beep / update title
+  const prevMsgCountRef = useRef(0)
   useEffect(() => {
-    if (!activeChannel) return
-    const channel = supabase.channel(`messages:${activeChannel}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `channel_id=eq.${activeChannel}`,
-      }, (payload) => {
-        const msg = payload.new as any
-        // Only append if not from current user (realtime will add for others)
-        if (msg.sender_id !== currentUser?.id) {
-          useStore.setState((s) => ({
-            messages: {
-              ...s.messages,
-              [activeChannel]: [...(s.messages[activeChannel] || []), msg],
-            },
-          }))
-          // Play beep sound for new message
-          playBeep()
-          // unread: document title
+    const count = currentMessages.length
+    if (count > prevMsgCountRef.current && count > 0) {
+      const lastMsg = currentMessages[count - 1]
+      if (lastMsg && lastMsg.sender_id !== currentUser?.id) {
+        playBeep()
+        if (!document.hasFocus()) {
           const prevTitle = document.title
-          if (!document.hasFocus()) {
-            document.title = '(1) 新消息 - 一人成军'
-            const restore = () => {
-              document.title = prevTitle
-              window.removeEventListener('focus', restore)
-            }
-            window.addEventListener('focus', restore, { once: true })
-          }
+          document.title = '(1) 新消息 - 一人成军'
+          const restore = () => { document.title = prevTitle; window.removeEventListener('focus', restore) }
+          window.addEventListener('focus', restore, { once: true })
         }
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [activeChannel, currentUser?.id])
+      }
+    }
+    prevMsgCountRef.current = count
+  }, [currentMessages, currentUser?.id])
 
   // ========== @mention ==========
   const filteredMembers = mentionQuery
