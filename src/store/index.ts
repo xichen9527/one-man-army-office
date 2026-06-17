@@ -121,7 +121,7 @@ interface AppState {
   addSocialPost: (p: SocialPostInsert) => Promise<void>
   updateSocialPost: (id: string, updates: SocialPostUpdate) => Promise<void>
   deleteSocialPost: (id: string) => Promise<void>
-  connectPlatform: (accountId: string, platform: string) => Promise<{ auth_url?: string; error?: string; needs_credentials?: boolean }>
+  initiateOAuth: (accountId: string, platform: string) => Promise<{ auth_url?: string; error?: string; needs_credentials?: boolean }>
   publishPost: (postId: string, accountId: string, content: string, title?: string, platform?: string) => Promise<{ success: boolean; error?: string; post_url?: string; post_id?: string }>
 
   // Video Conference
@@ -140,8 +140,17 @@ interface AppState {
   // Files
   files: DBFile[]
   fetchFiles: (projectId?: string) => Promise<void>
-  uploadFile: (file: File, projectId?: string, onProgress?: (pct: number) => void) => Promise<DBFile | null>
+  uploadFile: (file: File, projectId?: string, taskId?: string, onProgress?: (pct: number) => void) => Promise<DBFile | null>
+  moveFile: (fileId: string, newProjectId?: string, newTaskId?: string) => Promise<void>
   deleteFile: (id: string) => Promise<void>
+  // Realtime
+  __messageChannel: any
+  __conferenceChannel: any
+  __notificationChannel: any
+  subscribeToMessages: (channelId: string) => void
+  unsubscribeMessages: () => void
+  subscribeToConferences: () => void
+  subscribeToNotifications: (userId: string) => void
 }
 
 export type ConferenceStatus = Conference['status']
@@ -1021,7 +1030,9 @@ export const useStore = create<AppState>((set, get) => ({
   files: [],
   fetchFiles: async (projectId) => {
     try {
-      let query = supabase.from('files').select('*').order('created_at', { ascending: false })
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      let query = supabase.from('files').select('*').eq('uploaded_by', user.user.id).order('created_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
       const { data, error } = await query
       if (error) { console.error('fetchFiles failed:', error); return }
