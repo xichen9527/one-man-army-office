@@ -42,12 +42,8 @@ const platformNames: Record<string, string> = {
   toutiao: '头条', other: '其他',
 }
 
-const platformCharLimits: Record<string, number> = {
-  weibo: 140,
-  wechat: 1000,
-  xiaohongshu: 1000,
-}
-const defaultCharLimit = 2000
+import { platformRules, getStrictestRule, getImageLimit, getContentTypeConflicts, getContentRecommendations } from '@/config/platform-rules'
+import type { ContentType } from '@/config/platform-rules'
 
 function highlightHashtags(text: string): React.ReactNode[] {
   const parts = text.split(/(\s+)/)
@@ -234,9 +230,20 @@ export default function SocialMedia() {
     setAf({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
   }
 
-  const getCharLimit = (platform: string) => platformCharLimits[platform] ?? defaultCharLimit
+  // Platform-aware rules
+  const selectedRules = selectedPlatforms.map(p => platformRules[p]).filter(Boolean)
+  const strictTitleLimit = selectedRules.length > 0 ? getStrictestRule(selectedRules, 'title') : 0
+  const strictContentLimit = selectedRules.length > 0 ? getStrictestRule(selectedRules, 'content') : Infinity
+  const strictImageLimit = selectedRules.length > 0 ? getImageLimit(selectedRules) : 0
   const charCount = pf.content.length
-  const overLimit = selectedPlatforms.length > 0 && selectedPlatforms.some(p => charCount > getCharLimit(p))
+  const overLimit = selectedPlatforms.length > 0 && charCount > strictContentLimit
+  const titleRequired = selectedRules.some(r => r.title.required)
+  const titleOverLimit = pf.title.length > 0 && strictTitleLimit > 0 && pf.title.length > strictTitleLimit
+  const anyCoverRequired = selectedRules.some(r => r.images.coverRequired)
+  const anyVideoRequired = selectedRules.some(r => r.video.required)
+  const anyCategoryRequired = selectedRules.some(r => r.category.required)
+  const anyTagsRequired = selectedRules.some(r => r.tags.required)
+  const { recommended: recommendedPlatforms, warnings: contentWarnings } = getContentRecommendations(pf.content, mediaFiles.length > 0, mediaFiles.some(f => f.type.startsWith('video/')))
 
   const handleCreatePost = async (status?: SocialPostStatus, scheduledAt?: string | null) => {
     if (!pf.content.trim() || selectedPlatforms.length === 0) return
@@ -792,28 +799,33 @@ export default function SocialMedia() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>创建内容</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Input placeholder="标题（可选）" value={pf.title} onChange={e => setPf({ ...pf, title: e.target.value })} />
+            <div>
+              <Input placeholder={titleRequired ? `标题（必填${strictTitleLimit > 0 ? `，${strictTitleLimit}字以内` : ''}）` : '标题（可选）'} value={pf.title} onChange={e => setPf({ ...pf, title: e.target.value })} />
+              {titleOverLimit && <p className="text-[10px] text-red-500 mt-1">标题超出最严格限制 {strictTitleLimit} 字</p>}
+              {titleRequired && !pf.title.trim() && <p className="text-[10px] text-amber-500 mt-1">所选平台要求标题必填</p>}
+            </div>
             <div className="relative">
               <textarea placeholder="内容 *" value={pf.content} onChange={e => setPf({ ...pf, content: e.target.value })}
                 className="w-full min-h-[150px] border rounded-md p-3 text-sm resize-y outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
               <div className="absolute bottom-2 left-3 pointer-events-none text-sm whitespace-pre-wrap break-all opacity-0 max-h-0 overflow-hidden">{highlightHashtags(pf.content)}</div>
             </div>
-            
-            {/* 字数限制提示 */}
+
+            {/* Platform-aware char limits & validation */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400 font-medium">目标平台字数限制：</span>
-                <span className={overLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>{charCount} 字</span>
+                <span className="text-gray-400 font-medium">内容字数：</span>
+                <span className={overLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>{charCount} 字{strictContentLimit < Infinity ? ` / ${strictContentLimit}` : ''}</span>
               </div>
               {selectedPlatforms.length > 0 ? (
                 <div className="grid grid-cols-2 gap-1 text-xs">
                   {selectedPlatforms.map(p => {
-                    const limit = getCharLimit(p)
-                    const exceeded = charCount > limit
+                    const rule = platformRules[p]
+                    if (!rule) return null
+                    const exceeded = charCount > rule.content.maxLength
                     return (
                       <div key={p} className={`flex items-center gap-1 ${exceeded ? 'text-red-500' : 'text-gray-400'}`}>
-                        <span>{platformNames[p]}</span>
-                        <span className={exceeded ? 'font-medium' : ''}>{charCount}/{limit}</span>
+                        <span>{rule.name}</span>
+                        <span className={exceeded ? 'font-medium' : ''}>{charCount}/{rule.content.maxLength}</span>
                         {exceeded && <span>⚠️</span>}
                       </div>
                     )
@@ -822,7 +834,37 @@ export default function SocialMedia() {
               ) : (
                 <p className="text-xs text-amber-500">请选择至少一个目标平台</p>
               )}
+              {/* Content warnings */}
+              {contentWarnings.length > 0 && pf.content.length > 0 && (
+                <div className="space-y-0.5 mt-1">
+                  {contentWarnings.map((w, i) => <p key={i} className="text-[10px] text-amber-600">⚠️ {w}</p>)}
+                </div>
+              )}
             </div>
+
+            {/* Image count limit */}
+            {strictImageLimit > 0 && mediaFiles.length > 0 && (
+              <div className="text-xs">
+                <span className={mediaFiles.length > strictImageLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>
+                  已选 {mediaFiles.length} 张图片 / 最严格限制 {strictImageLimit} 张
+                </span>
+                {mediaFiles.length > strictImageLimit && <span className="text-red-500"> ⚠️ 部分平台图片数量超出限制</span>}
+              </div>
+            )}
+
+            {/* Video required warning */}
+            {anyVideoRequired && !mediaFiles.some(f => f.type.startsWith('video/')) && (
+              <div className="bg-red-50 rounded-lg p-2 text-xs text-red-700">
+                所选平台要求视频必填（如抖音、B站），请上传视频文件
+              </div>
+            )}
+
+            {/* Cover required warning */}
+            {anyCoverRequired && mediaFiles.length === 0 && (
+              <div className="bg-amber-50 rounded-lg p-2 text-xs text-amber-700">
+                所选平台要求封面图必填（如微信公众号、小红书、B站、今日头条）
+              </div>
+            )}
 
             {/* 平台选择（支持多选）*/}
             <div className="space-y-2">
@@ -867,30 +909,37 @@ export default function SocialMedia() {
               )}
             </div>
 
-            {/* 平台内容格式提示 */}
+            {/* 平台发布须知（基于 platform-rules 配置）*/}
             {selectedPlatforms.length > 0 && (
-              <div className="bg-blue-50 rounded-lg p-3 text-xs space-y-1">
-                <p className="font-medium text-blue-700">平台内容提示：</p>
-                <ul className="text-blue-600 space-y-0.5">
-                  {selectedPlatforms.includes('weibo') && (
-                    <li>• 微博：限 {platformCharLimits.weibo} 字，支持图片和视频</li>
-                  )}
-                  {selectedPlatforms.includes('wechat') && (
-                    <li>• 微信公众号：推荐图文格式，支持长文</li>
-                  )}
-                  {selectedPlatforms.includes('douyin') && (
-                    <li>• 抖音：需上传视频，文案建议简洁</li>
-                  )}
-                  {selectedPlatforms.includes('xiaohongshu') && (
-                    <li>• 小红书：推荐图文形式，重视标题和封面</li>
-                  )}
-                  {selectedPlatforms.includes('bilibili') && (
-                    <li>• B站：需上传视频，标题和封面很重要</li>
-                  )}
-                  {selectedPlatforms.includes('zhihu') && (
-                    <li>• 知乎：适合长文回答或专栏文章</li>
-                  )}
-                </ul>
+              <div className="bg-blue-50 rounded-lg p-3 text-xs space-y-2">
+                <p className="font-medium text-blue-700">📋 发布须知：</p>
+                {selectedPlatforms.map(p => {
+                  const rule = platformRules[p]
+                  if (!rule) return null
+                  return (
+                    <div key={p} className="space-y-0.5">
+                      <p className="font-medium text-blue-700">{rule.name}：</p>
+                      <ul className="text-blue-600 space-y-0.5 ml-2">
+                        {rule.tips.map((tip, i) => <li key={i}>• {tip}</li>)}
+                        {rule.images.coverRequired && <li>• 封面图必选（推荐 {rule.images.coverRecommendSize}）</li>}
+                        {rule.video.required && <li>• 视频必填（最长 {rule.video.maxLengthMin} 分钟）</li>}
+                        {rule.category.required && <li>• {rule.category.label}必选</li>}
+                        {rule.tags.required && <li>• {rule.tags.label}必填</li>}
+                        {rule.summary.required && <li>• 摘要必填（{rule.summary.maxLength} 字以内）</li>}
+                        {rule.music.supported && <li>• 支持添加背景音乐</li>}
+                      </ul>
+                    </div>
+                  )
+                })}
+                {/* 敏感内容提醒 */}
+                {selectedPlatforms.some(p => platformRules[p]?.sensitiveTips.length > 0) && (
+                  <div className="border-t border-blue-200 pt-1 mt-1">
+                    <p className="font-medium text-red-600">⚠️ 注意事项：</p>
+                    {[...new Set(selectedPlatforms.flatMap(p => platformRules[p]?.sensitiveTips || []))].map((tip, i) => (
+                      <p key={i} className="text-red-600">• {tip}</p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -981,9 +1030,9 @@ export default function SocialMedia() {
             <Button variant="outline" onClick={() => { setShowNewPost(false); setPublishError(null); setPublishSuccess(null) }}>取消</Button>
             <Button onClick={() => handleCreatePost('draft')} disabled={!pf.content.trim() || selectedPlatforms.length === 0}>保存草稿</Button>
             {scheduleEnabled && scheduledTime ? (
-              <Button onClick={() => handleCreatePost('scheduled', new Date(scheduledTime).toISOString())} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit} className="bg-amber-600 hover:bg-amber-700">定时发布</Button>
+              <Button onClick={() => handleCreatePost('scheduled', new Date(scheduledTime).toISOString())} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit || titleOverLimit} className="bg-amber-600 hover:bg-amber-700">定时发布</Button>
             ) : (
-              <Button onClick={() => handlePublishDirect()} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit || publishingIds.size > 0} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => handlePublishDirect()} disabled={!pf.content.trim() || selectedPlatforms.length === 0 || overLimit || titleOverLimit || publishingIds.size > 0} className="bg-blue-600 hover:bg-blue-700">
                 {publishingIds.size > 0 ? '发布中...' : '立即发布'}
               </Button>
             )}

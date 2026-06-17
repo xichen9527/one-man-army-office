@@ -23,6 +23,7 @@ export default function Collaboration() {
   const {
     currentUser, channels, messages, activeChannel, setActiveChannel, sendMessage, sendFileMessage,
     createChannel, updateChannel, deleteChannel, members, addMember, removeMember, tasks, projects,
+    documents, files, fetchDocuments, fetchFiles,
     updateMessage, deleteMessage, addNotification,
   } = useStore()
 
@@ -359,6 +360,7 @@ export default function Collaboration() {
           <TabsTrigger value="chat" className="gap-1.5"><MessageSquare className="w-4 h-4" />即时聊天</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5"><Users className="w-4 h-4" />成员管理</TabsTrigger>
           <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="w-4 h-4" />协同任务</TabsTrigger>
+          <TabsTrigger value="files" className="gap-1.5"><FileText className="w-4 h-4" />项目文件</TabsTrigger>
         </TabsList>
 
         {/* ========== Chat ========== */}
@@ -796,9 +798,9 @@ export default function Collaboration() {
         {/* ========== Collaborative Tasks ========== */}
         <TabsContent value="tasks">
           <div className="space-y-4">
-            {projects.filter(p => p.status === 'active').map(proj => {
+            {projects.map(proj => {
               const projTasks = tasks.filter(t => t.project_id === proj.id)
-              if (projTasks.length === 0) return null
+              // 显示所有项目（包括无任务的项目）
               return (
                 <Card key={proj.id}>
                   <CardHeader className="pb-2">
@@ -826,6 +828,49 @@ export default function Collaboration() {
                 </Card>
               )
             })}
+          </div>
+        </TabsContent>
+
+        {/* ========== Project Files ========== */}
+        <TabsContent value="files">
+          <div className="space-y-4">
+            {projects.map(proj => {
+              const projDocs = documents.filter(d => d.project_id === proj.id)
+              const projFiles = files.filter(f => f.project_id === proj.id)
+              if (projDocs.length === 0 && projFiles.length === 0) return null
+              return (
+                <Card key={proj.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-blue-500" />
+                      <CardTitle className="text-sm">{proj.name}</CardTitle>
+                      <Badge variant="secondary" className="text-[10px]">{projDocs.length} 文档 / {projFiles.length} 文件</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {projDocs.map(doc => (
+                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => window.open(doc.file_url, '_blank')}>
+                          <FileText className="w-4 h-4 text-green-500" />
+                          <span className="text-sm flex-1 truncate">{doc.title}</span>
+                          <span className="text-[10px] text-gray-400">{doc.file_type}</span>
+                        </div>
+                      ))}
+                      {projFiles.map(file => (
+                        <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => window.open(file.file_url, '_blank')}>
+                          <File className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm flex-1 truncate">{file.file_name}</span>
+                          <span className="text-[10px] text-gray-400">{file.file_type} {(file.file_size / 1024 / 1024).toFixed(2)}MB</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+            {projects.length === 0 && (
+              <div className="text-center text-gray-400 py-8">暂无项目，请先在项目管理中创建项目</div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
