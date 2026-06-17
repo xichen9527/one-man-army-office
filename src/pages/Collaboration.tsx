@@ -60,6 +60,19 @@ export default function Collaboration() {
   // Channel name validation state
   const [channelNameError, setChannelNameError] = useState('')
 
+  const navigate = useNavigate()
+
+  const handleFileClick = (file) => {
+    const { data, error } = supabase.storage.from('files').getPublicUrl(file.file_path)
+    if (error) {
+      toast({ title: '无法打开文件', description: error.message, variant: 'destructive' })
+    } else if (data?.publicUrl) {
+      window.open(data.publicUrl, '_blank')
+    } else {
+      toast({ title: '无法打开文件', description: '文件URL获取失败', variant: 'destructive' })
+    }
+  }
+
   // Play beep sound for new messages
   const playBeep = useCallback(() => {
     try {
@@ -834,14 +847,14 @@ export default function Collaboration() {
                   <CardContent>
                     <div className="space-y-2">
                       {projDocs.map(doc => (
-                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => window.open(doc.file_url, '_blank')}>
+                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/project-management?doc=${doc.id}`)}>
                           <FileText className="w-4 h-4 text-green-500" />
                           <span className="text-sm flex-1 truncate">{doc.title}</span>
                           <span className="text-[10px] text-gray-400">{doc.file_type}</span>
                         </div>
                       ))}
                       {projFiles.map(file => (
-                        <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => window.open(file.file_url, '_blank')}>
+                        <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => handleFileClick(file)}>
                           <File className="w-4 h-4 text-blue-500" />
                           <span className="text-sm flex-1 truncate">{file.file_name}</span>
                           <span className="text-[10px] text-gray-400">{file.file_type} {(file.file_size / 1024 / 1024).toFixed(2)}MB</span>

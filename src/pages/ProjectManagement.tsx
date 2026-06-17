@@ -5,7 +5,7 @@
 // ============================================================
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -135,6 +135,7 @@ function generateVersionHistory(doc: any) {
 // ==================== Main Component ====================
 export default function ProjectManagement() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const {
     currentUser, tasks, projects, members, documents, files,
     addTask, updateTask, deleteTask,
@@ -468,6 +469,18 @@ export default function ProjectManagement() {
     if (sortKey !== k) return <ChevronUp className="w-3 h-3 opacity-30" />
     return sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
   }
+
+  // Auto-open document from URL param (?doc=xxx)
+  useEffect(() => {
+    const docId = searchParams.get('doc')
+    if (docId && documents.length > 0) {
+      const doc = documents.find(d => d.id === docId)
+      if (doc) {
+        openDoc(docId)
+        navigate('/project-management', { replace: true })
+      }
+    }
+  }, [searchParams, documents])
 
   // -- Document handlers --
   const autoSave = useCallback((docId: string, title: string, content: string) => {

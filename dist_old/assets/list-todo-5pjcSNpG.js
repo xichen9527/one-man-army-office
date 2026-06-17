@@ -1,0 +1,2 @@
+import{P as e}from"./index-j3IRSEgL.js";var t=e(`folder-open`,[[`path`,{d:`m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2`,key:`usdka0`}]]),n=e(`list-todo`,[[`path`,{d:`M13 5h8`,key:`a7qcls`}],[`path`,{d:`M13 12h8`,key:`h98zly`}],[`path`,{d:`M13 19h8`,key:`c3s6r1`}],[`path`,{d:`m3 17 2 2 4-4`,key:`1jhpwq`}],[`rect`,{x:`3`,y:`4`,width:`6`,height:`6`,rx:`1`,key:`cif1o7`}]]);export{t as n,n as t};
+//# sourceMappingURL=list-todo-5pjcSNpG.js.map
