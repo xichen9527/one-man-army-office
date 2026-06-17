@@ -796,9 +796,64 @@ export default function SocialMedia() {
 
       {/* New post dialog */}
       <Dialog open={showNewPost} onOpenChange={setShowNewPost}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-5xl">
           <DialogHeader><DialogTitle>创建内容</DialogTitle></DialogHeader>
-          <div className="space-y-3">
+          <div className="flex gap-6 min-h-[400px]">
+            {/* 左侧：预览区 */}
+            <div className="w-2/5 border rounded-lg p-4 bg-gray-50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-500">📱 内容预览</span>
+                {selectedPlatforms.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {selectedPlatforms.map(p => platformNames[p] || p).join('、')}
+                  </Badge>
+                )}
+              </div>
+              <div className="bg-white rounded-lg border p-4 min-h-[320px]">
+                {!pf.title && !pf.content && mediaFiles.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-300 text-sm">
+                    填写内容后预览效果
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pf.title && (
+                      <h3 className="text-base font-bold text-gray-800 leading-snug">{pf.title}</h3>
+                    )}
+                    {pf.content && (
+                      <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
+                        {pf.content.length > 300 ? pf.content.slice(0, 300) + '...' : pf.content}
+                      </div>
+                    )}
+                    {mediaPreviews.length > 0 && (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {mediaPreviews.slice(0, 4).map((preview, idx) => (
+                          <div key={idx} className="relative rounded overflow-hidden bg-gray-100">
+                            {mediaFiles[idx]?.type.startsWith('video/') ? (
+                              <video src={preview} className="w-full h-24 object-cover" />
+                            ) : (
+                              <img src={preview} className="w-full h-24 object-cover" alt="" />
+                            )}
+                          </div>
+                        ))}
+                        {mediaPreviews.length > 4 && (
+                          <div className="flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded h-24">
+                            +{mediaPreviews.length - 4}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 pt-2 border-t text-xs text-gray-400">
+                      <span>{charCount} 字符</span>
+                      <span>{mediaFiles.length} 媒体</span>
+                      {overLimit && <span className="text-red-500">内容超限</span>}
+                      {contentWarnings.length > 0 && <span className="text-amber-500">{contentWarnings.length} 条警告</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* 右侧：编辑/发布区 */}
+            <div className="w-3/5 space-y-3 overflow-y-auto max-h-[460px] pr-1">
             <div>
               <Input placeholder={titleRequired ? `标题（必填${strictTitleLimit > 0 ? `，${strictTitleLimit}字以内` : ''}）` : '标题（可选）'} value={pf.title} onChange={e => setPf({ ...pf, title: e.target.value })} />
               {titleOverLimit && <p className="text-[10px] text-red-500 mt-1">标题超出最严格限制 {strictTitleLimit} 字</p>}
@@ -1020,6 +1075,7 @@ export default function SocialMedia() {
                 <p className="text-[10px] text-gray-400">选择一个未来的时间进行定时发布</p>
               </div>
             )}
+          </div>
           </div>
           {(publishError || publishSuccess) && (
             <div className={`text-xs rounded p-2 ${publishError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>

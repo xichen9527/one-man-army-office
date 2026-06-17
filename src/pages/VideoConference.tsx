@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import { toast } from '@/components/ui/toast'
 import {
   Video, Plus, Trash2, Users, Clock, Calendar, Copy, Link2,
   PhoneOff, Monitor, ExternalLink, CheckCircle2, AlertCircle
@@ -32,6 +33,35 @@ export default function VideoConference() {
   const [showNew, setShowNew] = useState(false)
   const [showMeeting, setShowMeeting] = useState(false)
   const [activeMeeting, setActiveMeeting] = useState<string | null>(null)
+
+  // API Configuration (stored in localStorage)
+  const API_CONFIG_KEY = 'video_conference_api'
+  const [showApiConfig, setShowApiConfig] = useState(false)
+  const [apiConfig, setApiConfig] = useState<{
+    provider: string
+    baseUrl: string
+    appId: string
+    secretKey: string
+    meetingSdkKey: string
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('video_conference_api')
+      return saved ? JSON.parse(saved) : {
+        provider: 'tencent',
+        baseUrl: 'https://api.meeting.qq.com',
+        appId: '',
+        secretKey: '',
+        meetingSdkKey: '',
+      }
+    } catch { return { provider: 'tencent', baseUrl: 'https://api.meeting.qq.com', appId: '', secretKey: '', meetingSdkKey: '' } }
+  })
+
+  const saveApiConfig = (config: typeof apiConfig) => {
+    localStorage.setItem('video_conference_api', JSON.stringify(config))
+    setApiConfig(config)
+    setShowApiConfig(false)
+    toast({ title: '配置已保存', description: `${config.provider === 'tencent' ? '腾讯会议' : config.provider === 'feishu' ? '飞书' : '自定义'} 接口配置已更新` })
+  }
 
   // New meeting form
   const [nf, setNf] = useState({
@@ -89,7 +119,7 @@ export default function VideoConference() {
   const ongoing = sortedConferences.filter(c => c.status === 'ongoing')
   const past = sortedConferences.filter(c => c.status === 'ended')
 
-  const PROXY_URL = 'http://localhost:3000'
+  const PROXY_URL = apiConfig.baseUrl || 'http://localhost:3000'
   const isLocalDev = window.location.hostname.includes('localhost') || window.location.hostname === '127.0.0.1'
   
   // 修复逻辑：本地开发时使用代理，线上环境时直接调用API
@@ -322,6 +352,9 @@ export default function VideoConference() {
           <Button variant="outline" onClick={() => setShowNew(true)}>
             <Plus className="w-4 h-4 mr-1" />预约会议
           </Button>
+          <Button variant="ghost" size="icon" onClick={() => setShowApiConfig(true)} title="API 配置">
+            <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </Button>
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-500">
           <span className="flex items-center gap-1"><Video className="w-4 h-4 text-green-500" />进行中: {ongoing.length}</span>
@@ -542,6 +575,60 @@ export default function VideoConference() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowNew(false); setSelectedParticipants([]); setParticipantSearch('') }}>取消</Button>
             <Button onClick={handleCreate} disabled={!nf.title.trim()}>创建会议</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* API Configuration Dialog */}
+      <Dialog open={showApiConfig} onOpenChange={setShowApiConfig}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>视频会议 API 配置</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="text-xs text-gray-500 mb-2">
+              在此配置视频会议 API 接口，支持腾讯会议、飞书等平台。配置信息仅保存在本地浏览器中。
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">API 提供商</label>
+              <select value={apiConfig.provider} onChange={e => setApiConfig({...apiConfig, provider: e.target.value})}
+                className="w-full border rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300">
+                <option value="tencent">腾讯会议</option>
+                <option value="feishu">飞书</option>
+                <option value="custom">自定义</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">API 地址</label>
+              <Input value={apiConfig.baseUrl} onChange={e => setApiConfig({...apiConfig, baseUrl: e.target.value})}
+                placeholder={apiConfig.provider === 'tencent' ? 'https://api.meeting.qq.com' : apiConfig.provider === 'feishu' ? 'https://open.feishu.cn' : '请输入 API 地址'} />
+              <p className="text-[10px] text-gray-400 mt-1">视频会议 API 的基础 URL 地址</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{apiConfig.provider === 'tencent' ? 'App ID' : apiConfig.provider === 'feishu' ? 'App ID' : '应用 ID'}</label>
+              <Input value={apiConfig.appId} onChange={e => setApiConfig({...apiConfig, appId: e.target.value})}
+                placeholder="请输入 App ID" />
+              <p className="text-[10px] text-gray-400 mt-1">{apiConfig.provider === 'tencent' ? '腾讯会议开放平台申请的 App ID' : '开放平台创建应用后获取的 ID'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{apiConfig.provider === 'tencent' ? 'Secret Key' : apiConfig.provider === 'feishu' ? 'App Secret' : '密钥'}</label>
+              <Input value={apiConfig.secretKey} onChange={e => setApiConfig({...apiConfig, secretKey: e.target.value})}
+                type="password" placeholder="请输入密钥" />
+              <p className="text-[10px] text-gray-400 mt-1">接口调用密钥，用于 API 鉴权</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">SDK Key（可选）</label>
+              <Input value={apiConfig.meetingSdkKey} onChange={e => setApiConfig({...apiConfig, meetingSdkKey: e.target.value})}
+                type="password" placeholder="用于会议 SDK 客户端集成" />
+              <p className="text-[10px] text-gray-400 mt-1">腾讯会议 SDK 集成时需要的 SDK Key</p>
+            </div>
+            {apiConfig.baseUrl && apiConfig.appId && apiConfig.secretKey && (
+              <div className="bg-green-50 rounded-lg p-2 text-xs text-green-700">
+                ✓ 配置已填写完整，可使用 API 模式创建会议
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApiConfig(false)}>取消</Button>
+            <Button onClick={() => saveApiConfig(apiConfig)}>保存配置</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
