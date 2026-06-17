@@ -1,17 +1,14 @@
 -- Fix video_conferences table to match frontend Conference type
 -- The original schema was missing many columns that the frontend expects
 
--- Drop existing table and recreate with correct schema
--- (This is a development fix; in production you'd use ALTER TABLE ADD COLUMN)
-
 -- First, drop RLS policies
 DROP POLICY IF EXISTS "video_conferences_select_own" ON public.video_conferences;
 DROP POLICY IF EXISTS "video_conferences_insert_own" ON public.video_conferences;
 DROP POLICY IF EXISTS "video_conferences_update_own" ON public.video_conferences;
 DROP POLICY IF EXISTS "video_conferences_delete_own" ON public.video_conferences;
 
--- Drop the table
-DROP TABLE IF EXISTS public.video_conferences;
+-- Drop the table with CASCADE to remove dependent objects (like foreign keys from video_conference_participants)
+DROP TABLE IF EXISTS public.video_conferences CASCADE;
 
 -- Recreate with full schema matching the frontend Conference type
 CREATE TABLE public.video_conferences (

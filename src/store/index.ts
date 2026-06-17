@@ -347,8 +347,8 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const { data, error } = await supabase.from('channels').select('*').or(`created_by.eq.${user.user.id}`).eq('is_public', false).order('created_at')
-      const { data: publicData, error: publicError } = await supabase.from('channels').select('*').eq('is_public', true).order('created_at')
+      const { data, error } = await supabase.from('channels').select('*').or(`created_by.eq.${user.user.id}`).eq('is_private', true).order('created_at')
+      const { data: publicData, error: publicError } = await supabase.from('channels').select('*').eq('is_private', false).order('created_at')
       const allData = [...(data || []), ...((publicData || [])).filter(p => !(data || []).some(c => c.id === p.id))]
       const mergedError = error || publicError
       if (mergedError) { console.error('fetchChannels failed:', mergedError); return }
