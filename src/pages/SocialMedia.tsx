@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,13 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
+import { toast } from '@/components/ui/toast'
 import {
   Plus, Trash2, Edit3, RefreshCw, ExternalLink, Search,
   TrendingUp, TrendingDown, Minus, BarChart3, Users, Eye,
   Heart, MessageCircle, Share2, Calendar, CheckCircle, XCircle,
-  Clock, MoreVertical, ArrowUpRight, Globe
+  Clock, MoreVertical, ArrowUpRight, Globe, Upload, Image, Video, X, Loader2
 } from 'lucide-react'
 import { useStore } from '@/store'
+import { supabase } from '@/db/supabase'
 import type { SocialPostStatus } from '@/types/database'
 import type { SocialAccount, SocialPostPlatform } from '@/types/database'
 import { format, parseISO } from 'date-fns'
@@ -91,6 +93,11 @@ export default function SocialMedia() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]) // 多选平台
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduledTime, setScheduledTime] = useState('')
+  // Media upload
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredPosts = useMemo(() =>
     socialPosts.filter(p => !search || p.title.includes(search) || p.content.includes(search)),
@@ -234,6 +241,9 @@ export default function SocialMedia() {
   const handleCreatePost = async (status?: SocialPostStatus, scheduledAt?: string | null) => {
     if (!pf.content.trim() || selectedPlatforms.length === 0) return
 
+    // 先上传媒体文件
+    const mediaUrls = await uploadMediaFiles()
+
     // 创建内容
     const post = await addSocialPost({
       title: pf.title,
@@ -243,6 +253,7 @@ export default function SocialMedia() {
       likes: 0, comments: 0, shares: 0, views: 0,
       scheduled_at: scheduledAt || null,
       published_at: scheduledAt ? null : new Date().toISOString(),
+      media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     })
 
     // 为每个选中的平台创建关联记录
@@ -265,10 +276,91 @@ export default function SocialMedia() {
     setSelectedPlatforms([])
     setScheduleEnabled(false)
     setScheduledTime('')
+    setMediaFiles([])
+    setMediaPreviews([])
+  }
+
+  // Media upload handlers
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    // Check file types and sizes
+    const validFiles: File[] = []
+    const previews: string[] = []
+
+    for (const file of files) {
+      // Check file size (max 50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        toast({ title: '文件过大', description: `${file.name} 超过50MB限制`, variant: 'destructive' })
+        continue
+      }
+
+      // Check file type based on selected platforms
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+
+      if (isImage || isVideo) {
+        validFiles.push(file)
+        previews.push(URL.createObjectURL(file))
+      } else {
+        toast({ title: '不支持的文件类型', description: `${file.name} 不是图片或视频`, variant: 'destructive' })
+      }
+    }
+
+    if (validFiles.length > 0) {
+      setMediaFiles(prev => [...prev, ...validFiles])
+      setMediaPreviews(prev => [...prev, ...previews])
+    }
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleRemoveMedia = (index: number) => {
+    URL.revokeObjectURL(mediaPreviews[index])
+    setMediaFiles(prev => prev.filter((_, i) => i !== index))
+    setMediaPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const uploadMediaFiles = async (): Promise<string[]> => {
+    if (mediaFiles.length === 0) return []
+
+    setUploadingMedia(true)
+    const uploadedUrls: string[] = []
+
+    try {
+      for (const file of mediaFiles) {
+        const ext = file.name.split('.').pop() || 'bin'
+        const path = `social-media/${currentUser?.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('files')
+          .upload(path, file, { cacheControl: '3600', upsert: false })
+
+        if (uploadError) {
+          console.error('Failed to upload media:', uploadError)
+          toast({ title: '上传失败', description: file.name, variant: 'destructive' })
+          continue
+        }
+
+        const { data: urlData } = supabase.storage.from('files').getPublicUrl(path)
+        if (urlData?.publicUrl) {
+          uploadedUrls.push(urlData.publicUrl)
+        }
+      }
+    } finally {
+      setUploadingMedia(false)
+    }
+
+    return uploadedUrls
   }
 
   const handlePublishDirect = async () => {
     if (!pf.content.trim() || selectedPlatforms.length === 0) return
+
+    // 先上传媒体文件
+    const mediaUrls = await uploadMediaFiles()
 
     // 创建内容
     await addSocialPost({
@@ -279,6 +371,7 @@ export default function SocialMedia() {
       likes: 0, comments: 0, shares: 0, views: 0,
       scheduled_at: null,
       published_at: null,
+      media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     })
 
     // 获取刚创建的内容
@@ -800,6 +893,68 @@ export default function SocialMedia() {
                 </ul>
               </div>
             )}
+
+            {/* 媒体上传 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">媒体内容</span>
+                <span className="text-xs text-gray-400">图片或视频（最多50MB/个）</span>
+              </div>
+              
+              {/* 已上传的媒体预览 */}
+              {mediaPreviews.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {mediaPreviews.map((preview, idx) => (
+                    <div key={idx} className="relative group">
+                      {mediaFiles[idx]?.type.startsWith('video/') ? (
+                        <video src={preview} className="w-full h-20 object-cover rounded-md bg-gray-100" />
+                      ) : (
+                        <img src={preview} className="w-full h-20 object-cover rounded-md" alt={`媒体${idx + 1}`} />
+                      )}
+                      <button
+                        onClick={() => handleRemoveMedia(idx)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      {mediaFiles[idx]?.type.startsWith('video/') && (
+                        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] flex items-center gap-0.5">
+                          <Video className="w-2.5 h-2.5" /> 视频
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 上传按钮 */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*,video/*"
+                multiple
+                className="hidden"
+                onChange={handleMediaSelect}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors flex flex-col items-center gap-1"
+                disabled={uploadingMedia}
+              >
+                {uploadingMedia ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>上传中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-5 h-5" />
+                    <span>点击上传图片或视频</span>
+                    <span className="text-[10px] text-gray-400">{selectedPlatforms.includes('douyin') || selectedPlatforms.includes('bilibili') ? '视频平台建议上传视频文件' : '支持 JPG、PNG、GIF、MP4 等格式'}</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={scheduleEnabled} onCheckedChange={v => setScheduleEnabled(v)} />
