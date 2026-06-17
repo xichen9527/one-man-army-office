@@ -172,7 +172,14 @@ export const useStore = create<AppState>((set, get) => ({
   loadUser: async () => {
     set({ loading: true })
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      // Timeout wrapper to prevent infinite loading
+      const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+        ]) as Promise<T>
+      }
+      const { data: { session } } = await withTimeout(supabase.auth.getSession(), 10000)
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         set({ currentUser: profile ? { ...profile, avatar: profile.avatar_url || undefined } : null, isAuthenticated: true, loading: false })
@@ -199,7 +206,8 @@ export const useStore = create<AppState>((set, get) => ({
       } else {
         set({ currentUser: null, isAuthenticated: false, loading: false })
       }
-    } catch {
+    } catch (e) {
+      console.error('[loadUser] failed:', e)
       set({ currentUser: null, isAuthenticated: false, loading: false })
     }
   },
