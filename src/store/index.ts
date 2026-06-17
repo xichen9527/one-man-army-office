@@ -863,10 +863,11 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      let query = supabase.from('social_post_platforms').select(`
-        *,
-        social_accounts!inner(user_id)
-      `).eq('social_accounts.user_id', user.user.id)
+      // 先获取用户的 social account ids
+      const { data: accounts } = await supabase.from('social_accounts').select('id').eq('user_id', user.user.id)
+      if (!accounts || accounts.length === 0) { set({ socialPostPlatforms: [] }); return }
+      const accountIds = accounts.map(a => a.id)
+      let query = supabase.from('social_post_platforms').select('*').in('account_id', accountIds)
       if (postId) query = query.eq('post_id', postId)
       const { data, error } = await query
       if (error) { console.error('fetchSocialPostPlatforms failed:', error); return }
@@ -1091,7 +1092,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ========== Files ==========
   files: [],
-  fetchFiles: async (projectId) => {
+  fetchFiles: async (projectId?, taskId?) => {
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
