@@ -18,6 +18,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 // Projects merged into ProjectManagement
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'))
 const Invite = lazy(() => import('@/pages/Invite'))
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 
 function LoadingFallback() {
   return (
@@ -89,6 +90,7 @@ export default function App() {
         <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Login /></ErrorBoundary></Suspense></RedirectIfAuth>} />
         <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Register /></ErrorBoundary></Suspense></RedirectIfAuth>} />
         <Route path="/invite/:token" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Invite /></Suspense></ErrorBoundary>} />
+        <Route path="/reset-password" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ResetPassword /></Suspense></ErrorBoundary>} />
 
         {/* 受保护路由 */}
         <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
@@ -99,7 +101,7 @@ export default function App() {
           <Route path="collaboration" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Collaboration /></Suspense></ErrorBoundary>} />
           <Route path="crm" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><CRM /></Suspense></ErrorBoundary>} />
           <Route path="social-media" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><SocialMedia /></Suspense></ErrorBoundary>} />
-          // projects route merged into project-management
+          {/* projects route merged into project-management */}
           <Route path="projects/:id" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense></ErrorBoundary>} />
           <Route path="video-conference" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense></ErrorBoundary>} />
           <Route path="settings" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Settings /></Suspense></ErrorBoundary>} />

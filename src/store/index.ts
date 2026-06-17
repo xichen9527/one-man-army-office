@@ -31,6 +31,7 @@ interface AppState {
   signUp: (email: string, password: string, fullName: string, username: string) => Promise<{ error: any }>
   signIn: (email: string, password: string, remember?: boolean) => Promise<{ error: any }>
   signOut: () => Promise<void>
+  updatePassword: (newPassword: string) => Promise<{ error: any }>
 
   // Projects
   projects: Project[]
@@ -222,6 +223,14 @@ export const useStore = create<AppState>((set, get) => ({
       notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [],
       conferences: [], customers: [], salesOpportunities: [], members: [], invitations: [], files: [],
     })
+  },
+  updatePassword: async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      return { error }
+    } catch (e: any) {
+      return { error: e }
+    }
   },
 
   // ========== Projects ==========

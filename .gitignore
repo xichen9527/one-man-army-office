@@ -27,3 +27,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temp test/debug files
+check-csp.*
+serve.js
+test-*
+test_*
