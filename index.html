@@ -12,6 +12,8 @@
         var search = window.location.search;
         if (search.indexOf('?p=') === 0) {
           var path = decodeURIComponent(search.substring(3));
+          // 确保路径以 / 开头，避免拼出 /one-man-army-officeproject-management
+          if (path.length > 0 && path.charAt(0) !== '/') path = '/' + path;
           window.history.replaceState(null, null, '/one-man-army-office' + path);
         }
       })();
