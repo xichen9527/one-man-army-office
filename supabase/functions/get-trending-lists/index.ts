@@ -6,142 +6,314 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Simulated trending data for 9 platforms
-// In production, replace with real API calls
-function getMockTrending(platform: string) {
-  const now = new Date().toISOString()
-  const platforms: Record<string, Array<{ rank: number; title: string; heat: string; url: string }>> = {
-    weibo: [
-      { rank: 1, title: '全国高考作文题公布', heat: '9876543', url: 'https://weibo.com/hot/1' },
-      { rank: 2, title: '新能源汽车补贴政策调整', heat: '8765432', url: 'https://weibo.com/hot/2' },
-      { rank: 3, title: 'AI大模型最新突破', heat: '7654321', url: 'https://weibo.com/hot/3' },
-      { rank: 4, title: '夏季防晒科普指南', heat: '6543210', url: 'https://weibo.com/hot/4' },
-      { rank: 5, title: '国产芯片新进展', heat: '5432109', url: 'https://weibo.com/hot/5' },
-    ],
-    douyin: [
-      { rank: 1, title: '城市夜景航拍合集', heat: '5.2亿', url: 'https://douyin.com/hot/1' },
-      { rank: 2, title: '夏日饮品制作教程', heat: '4.8亿', url: 'https://douyin.com/hot/2' },
-      { rank: 3, title: '宠物搞笑瞬间', heat: '4.1亿', url: 'https://douyin.com/hot/3' },
-      { rank: 4, title: '健身打卡挑战', heat: '3.5亿', url: 'https://douyin.com/hot/4' },
-      { rank: 5, title: '旅行vlog推荐', heat: '3.2亿', url: 'https://douyin.com/hot/5' },
-    ],
-    bilibili: [
-      { rank: 1, title: '年度动画番剧盘点', heat: '3245万', url: 'https://bilibili.com/hot/1' },
-      { rank: 2, title: '程序员日常搞笑', heat: '2987万', url: 'https://bilibili.com/hot/2' },
-      { rank: 3, title: '游戏新游评测', heat: '2654万', url: 'https://bilibili.com/hot/3' },
-      { rank: 4, title: '硬核科普系列', heat: '2345万', url: 'https://bilibili.com/hot/4' },
-      { rank: 5, title: '国风音乐推荐', heat: '2123万', url: 'https://bilibili.com/hot/5' },
-    ],
-    xiaohongshu: [
-      { rank: 1, title: '夏日穿搭灵感', heat: '1.2亿', url: 'https://xiaohongshu.com/hot/1' },
-      { rank: 2, title: '平价好物推荐', heat: '9876万', url: 'https://xiaohongshu.com/hot/2' },
-      { rank: 3, title: '减脂餐食谱', heat: '8765万', url: 'https://xiaohongshu.com/hot/3' },
-      { rank: 4, title: '护肤成分科普', heat: '7654万', url: 'https://xiaohongshu.com/hot/4' },
-      { rank: 5, title: '家居收纳技巧', heat: '6543万', url: 'https://xiaohongshu.com/hot/5' },
-    ],
-    zhihu: [
-      { rank: 1, title: '如何看待AI对就业的影响', heat: '4567万', url: 'https://zhihu.com/hot/1' },
-      { rank: 2, title: '年轻人该不该买房', heat: '3456万', url: 'https://zhihu.com/hot/2' },
-      { rank: 3, title: '哪些专业未来发展前景好', heat: '2345万', url: 'https://zhihu.com/hot/3' },
-      { rank: 4, title: '远程办公的利与弊', heat: '1234万', url: 'https://zhihu.com/hot/4' },
-      { rank: 5, title: '如何评价最新科技产品', heat: '987万', url: 'https://zhihu.com/hot/5' },
-    ],
-    toutiao: [
-      { rank: 1, title: '国内经济形势分析', heat: '5678万', url: 'https://toutiao.com/hot/1' },
-      { rank: 2, title: '教育改革新政策', heat: '4567万', url: 'https://toutiao.com/hot/2' },
-      { rank: 3, title: '健康生活新发现', heat: '3456万', url: 'https://toutiao.com/hot/3' },
-      { rank: 4, title: '科技创新成果', heat: '2345万', url: 'https://toutiao.com/hot/4' },
-      { rank: 5, title: '国际局势解读', heat: '1234万', url: 'https://toutiao.com/hot/5' },
-    ],
-    wechat: [
-      { rank: 1, title: '微信新功能上线', heat: '2345万', url: 'https://weixin.qq.com/hot/1' },
-      { rank: 2, title: '公众号年度精选', heat: '1987万', url: 'https://weixin.qq.com/hot/2' },
-      { rank: 3, title: '小程序热门推荐', heat: '1654万', url: 'https://weixin.qq.com/hot/3' },
-      { rank: 4, title: '视频号爆款内容', heat: '1321万', url: 'https://weixin.qq.com/hot/4' },
-      { rank: 5, title: '朋友圈热门话题', heat: '1098万', url: 'https://weixin.qq.com/hot/5' },
-    ],
-    kuaishou: [
-      { rank: 1, title: '乡村生活记录', heat: '4.5亿', url: 'https://kuaishou.com/hot/1' },
-      { rank: 2, title: '美食制作分享', heat: '3.8亿', url: 'https://kuaishou.com/hot/2' },
-      { rank: 3, title: '手工制作过程', heat: '3.2亿', url: 'https://kuaishou.com/hot/3' },
-      { rank: 4, title: '民间才艺展示', heat: '2.7亿', url: 'https://kuaishou.com/hot/4' },
-      { rank: 5, title: '乡村风景航拍', heat: '2.1亿', url: 'https://kuaishou.com/hot/5' },
-    ],
-    baidu: [
-      { rank: 1, title: '高考真题答案', heat: '6789万', url: 'https://baidu.com/hot/1' },
-      { rank: 2, title: '天气预报', heat: '5678万', url: 'https://baidu.com/hot/2' },
-      { rank: 3, title: '股票行情', heat: '4567万', url: 'https://baidu.com/hot/3' },
-      { rank: 4, title: '旅游景点推荐', heat: '3456万', url: 'https://baidu.com/hot/4' },
-      { rank: 5, title: '最新科技新闻', heat: '2345万', url: 'https://baidu.com/hot/5' },
-    ],
-  }
-
-  if (platform && platforms[platform]) {
-    return { platform, topics: platforms[platform], updated_at: now }
-  }
-
-  // Return all platforms
-  const allPlatforms = Object.entries(platforms).map(([name, topics]) => ({
-    platform: name,
-    topics,
-    updated_at: now,
-  }))
-  return { all: allPlatforms }
+interface TrendingItem {
+  title: string
+  heat: number
+  url: string | null
+  trend: 'up' | 'down' | 'stable'
+  platform: string
+  description: string | null
 }
 
+// ========== Bilibili Hot Search ==========
+async function fetchBilibiliHot(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://api.bilibili.com/x/web-interface/search/square?limit=20', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    })
+    const json = await res.json()
+    if (json.code !== 0 || !json.data?.trending?.list) return []
+    return json.data.trending.list.slice(0, 15).map((item: any, i: number) => ({
+      title: item.keyword || item.show_name || '',
+      heat: item.heat_score || 0,
+      url: `https://search.bilibili.com/all?keyword=${encodeURIComponent(item.keyword)}`,
+      trend: i < 3 ? 'up' as const : 'stable' as const,
+      platform: 'bilibili',
+      description: null,
+    }))
+  } catch (e) {
+    console.error('Bilibili hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Bilibili Ranking (Popular Videos) ==========
+async function fetchBilibiliRanking(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    })
+    const json = await res.json()
+    if (json.code !== 0 || !json.data?.list) return []
+    return json.data.list.slice(0, 15).map((item: any, i: number) => ({
+      title: item.title || '',
+      heat: item.stat?.view || 0,
+      url: `https://www.bilibili.com/video/${item.bvid}`,
+      trend: i < 3 ? 'up' as const : 'stable' as const,
+      platform: 'bilibili',
+      description: item.desc?.slice(0, 100) || null,
+    }))
+  } catch (e) {
+    console.error('Bilibili ranking fetch error:', e)
+    return []
+  }
+}
+
+// ========== Weibo Hot (via m.weibo.cn) ==========
+async function fetchWeiboHot(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://m.weibo.cn/api/container/getIndex?containerid=106003type%3D25%26t%3D3%26disable_hot%3D1%26filter_type%3Drealtimehot', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': 'https://m.weibo.cn/',
+      },
+    })
+    const json = await res.json()
+    if (json.ok !== 1 || !json.data?.cards) return []
+    const cardGroup = json.data.cards[0]?.card_group
+    if (!cardGroup) return []
+    return cardGroup.slice(0, 15).map((item: any, i: number) => ({
+      title: item.desc || item.word || '',
+      heat: parseInt(item.desc_extr || '0', 10) || 0,
+      url: item.scheme ? `https://m.weibo.cn/search?containerid=${item.scheme}` : `https://s.weibo.com/weibo?q=${encodeURIComponent(item.desc || item.word)}`,
+      trend: (item.icon_desc === '热' || item.icon_desc === '新' || i < 3) ? 'up' as const : 'stable' as const,
+      platform: 'weibo',
+      description: null,
+    }))
+  } catch (e) {
+    console.error('Weibo hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Zhihu Hot (via page scraping fallback) ==========
+async function fetchZhihuHot(): Promise<TrendingItem[]> {
+  try {
+    // Zhihu API requires auth, try the public page
+    const res = await fetch('https://www.zhihu.com/hot', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+      },
+    })
+    const html = await res.text()
+    // Try to extract initial data from HTML
+    const match = html.match(/"initialState":\s*({.+?})\s*<\/script>/)
+    if (!match) {
+      // Fallback: try the API with cookie-less approach
+      const apiRes = await fetch('https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=15', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json',
+        },
+      })
+      if (apiRes.ok) {
+        const json = await apiRes.json()
+        if (json.data) {
+          return json.data.slice(0, 15).map((item: any, i: number) => ({
+            title: item.target?.title || '',
+            heat: item.detail_text ? parseInt(item.detail_text.replace(/[^\d]/g, ''), 10) : 0,
+            url: `https://www.zhihu.com/question/${item.target?.id}`,
+            trend: i < 3 ? 'up' as const : 'stable' as const,
+            platform: 'zhihu',
+            description: item.target?.excerpt?.slice(0, 100) || null,
+          }))
+        }
+      }
+      return []
+    }
+    // Parse initialState if available (complex, skip for now)
+    return []
+  } catch (e) {
+    console.error('Zhihu hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Baidu Hot (HTML parsing) ==========
+async function fetchBaiduHot(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://top.baidu.com/board?tab=realtime', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html',
+      },
+    })
+    const html = await res.text()
+    // Parse the HTML for hot items - Baidu embeds data in script tags
+    const items: TrendingItem[] = []
+    // Try to find JSON data in the page
+    const jsonMatch = html.match(/"content":\s*\[({[\s\S]+?})\]/)
+    if (jsonMatch) {
+      // Complex parsing needed, use simpler regex approach
+    }
+
+    // Fallback: parse from rendered HTML
+    const titleRegex = /class="c-single-text-ellipsis"[^>]*>([^<]+)</g
+    const heatRegex = /class="hot-index_1Bl1a"[^>]*>([^<]+)</g
+    const linkRegex = /href="(https:\/\/www\.baidu\.com\/s\?[^"]+fyb[^"]*)"/g
+
+    const titles: string[] = []
+    const heats: string[] = []
+    const links: string[] = []
+
+    let m
+    while ((m = titleRegex.exec(html)) !== null) titles.push(m[1].trim())
+    while ((m = heatRegex.exec(html)) !== null) heats.push(m[1].trim())
+    while ((m = linkRegex.exec(html)) !== null) links.push(m[1])
+
+    const count = Math.min(titles.length, 15)
+    for (let i = 0; i < count; i++) {
+      items.push({
+        title: titles[i] || '',
+        heat: parseInt((heats[i] || '0').replace(/[^\d]/g, ''), 10) || 0,
+        url: links[i] || null,
+        trend: i < 3 ? 'up' as const : 'stable' as const,
+        platform: 'baidu',
+        description: null,
+      })
+    }
+    return items
+  } catch (e) {
+    console.error('Baidu hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Douyin Hot (via HTML scraping) ==========
+async function fetchDouyinHot(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://www.douyin.com/hot', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+        'Cookie': 'ttwid=1',
+      },
+      redirect: 'follow',
+    })
+    const html = await res.text()
+    // Douyin embeds data in <script> tags with RENDER_DATA
+    const match = html.match(/id="RENDER_DATA"[^>]*>([^<]+)</)
+    if (!match) return []
+    const decoded = decodeURIComponent(match[1])
+    const data = JSON.parse(decoded)
+    // Navigate the structure to find hot list
+    const hotList = data?.app?.videoList || data?.data || []
+    if (!Array.isArray(hotList) || hotList.length === 0) return []
+
+    return hotList.slice(0, 15).map((item: any, i: number) => ({
+      title: item.title || item.word || '',
+      heat: item.hot_value || 0,
+      url: item.url || `https://www.douyin.com/hot/${item.id || ''}`,
+      trend: i < 3 ? 'up' as const : 'stable' as const,
+      platform: 'douyin',
+      description: null,
+    }))
+  } catch (e) {
+    console.error('Douyin hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Toutiao Hot ==========
+async function fetchToutiaoHot(): Promise<TrendingItem[]> {
+  try {
+    const res = await fetch('https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+    })
+    const json = await res.json()
+    if (!json.data) return []
+    return json.data.slice(0, 15).map((item: any, i: number) => ({
+      title: item.Title || item.title || '',
+      heat: item.HotValue || item.hot_value || 0,
+      url: item.Url || item.url || null,
+      trend: i < 3 ? 'up' as const : 'stable' as const,
+      platform: 'toutiao',
+      description: null,
+    }))
+  } catch (e) {
+    console.error('Toutiao hot fetch error:', e)
+    return []
+  }
+}
+
+// ========== Main Handler ==========
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: '未授权访问' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const body = await req.json().catch(() => ({}))
     const { platform } = body
 
-    const result = getMockTrending(platform)
+    // Fetch from all supported platforms in parallel
+    const fetchers: Record<string, () => Promise<TrendingItem[]>> = {
+      weibo: fetchWeiboHot,
+      bilibili: fetchBilibiliHot,
+      baidu: fetchBaiduHot,
+      zhihu: fetchZhihuHot,
+      douyin: fetchDouyinHot,
+      toutiao: fetchToutiaoHot,
+    }
 
-    // Try to store results in trending_topics table
+    let allItems: TrendingItem[] = []
+
+    if (platform && fetchers[platform]) {
+      allItems = await fetchers[platform]()
+    } else {
+      // Fetch all platforms in parallel
+      const results = await Promise.allSettled(
+        Object.entries(fetchers).map(async ([name, fn]) => {
+          const items = await fn()
+          return items
+        })
+      )
+      allItems = results
+        .filter((r): r is PromiseFulfilledResult<TrendingItem[]> => r.status === 'fulfilled')
+        .flatMap(r => r.value)
+    }
+
+    // Store results in trending_topics table (upsert: delete old + insert new)
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-      if (supabaseUrl && supabaseKey) {
+      if (supabaseUrl && supabaseKey && allItems.length > 0) {
         const supabase = createClient(supabaseUrl, supabaseKey)
-        const topicsToStore = result.all
-          ? result.all.flatMap((p: any) => p.topics.map((t: any) => ({
-              platform: p.platform,
-              rank: t.rank,
-              title: t.title,
-              heat: t.heat,
-              url: t.url,
-              fetched_at: p.updated_at,
-            })))
-          : result.topics.map((t: any) => ({
-              platform: result.platform,
-              rank: t.rank,
-              title: t.title,
-              heat: t.heat,
-              url: t.url,
-              fetched_at: result.updated_at,
-            }))
 
-        // Insert in batches, ignore errors (table may not exist yet)
-        if (topicsToStore.length > 0) {
-          await supabase.from('trending_topics').insert(topicsToStore)
+        const platforms = [...new Set(allItems.map(i => i.platform))]
+        // Delete old data for fetched platforms
+        for (const p of platforms) {
+          await supabase.from('trending_topics').delete().eq('platform', p)
         }
+
+        // Insert new data
+        const rows = allItems.map(item => ({
+          title: item.title,
+          platform: item.platform,
+          heat: item.heat,
+          trend: item.trend,
+          url: item.url,
+          description: item.description,
+        }))
+        const { error: insertError } = await supabase.from('trending_topics').insert(rows)
+        if (insertError) console.error('Insert trending error:', insertError)
       }
     } catch (e) {
       console.warn('Failed to store trending data:', e)
     }
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      success: true,
+      count: allItems.length,
+      platforms: [...new Set(allItems.map(i => i.platform))],
+      items: allItems,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {

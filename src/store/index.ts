@@ -118,6 +118,7 @@ interface AppState {
   fetchSocialPosts: (accountId?: string) => Promise<void>
   fetchSocialPostPlatforms: (postId?: string) => Promise<void>
   fetchTrendingTopics: () => Promise<void>
+  refreshTrendingTopics: () => Promise<void>
   addSocialAccount: (a: Omit<SocialAccountInsert, 'user_id'>) => Promise<void>
   updateSocialAccount: (id: string, updates: SocialAccountUpdate) => Promise<void>
   deleteSocialAccount: (id: string) => Promise<void>
@@ -880,6 +881,26 @@ export const useStore = create<AppState>((set, get) => ({
       if (error) { console.error('fetchTrendingTopics failed:', error); return }
       set({ trendingTopics: (data as TrendingTopic[] | null) || [] })
     } catch (e) { console.error('fetchTrendingTopics failed:', e) }
+  },
+  refreshTrendingTopics: async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { console.error('refreshTrendingTopics: not authenticated'); return }
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-trending-lists`
+      const res = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) { console.error('refreshTrendingTopics: Edge Function error', res.status); return }
+      // Re-fetch from DB after refresh
+      await get().fetchTrendingTopics()
+    } catch (e) { console.error('refreshTrendingTopics failed:', e) }
   },
   addSocialAccount: async (a) => {
     try {

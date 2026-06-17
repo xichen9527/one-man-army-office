@@ -58,6 +58,7 @@ function highlightHashtags(text: string): React.ReactNode[] {
 export default function SocialMedia() {
   const {
     socialAccounts, socialPosts, socialPostPlatforms, trendingTopics, currentUser,
+    refreshTrendingTopics,
     addSocialAccount, updateSocialAccount, deleteSocialAccount,
     initiateOAuth, publishPost,
     addSocialPost, updateSocialPost, deleteSocialPost,
@@ -80,6 +81,8 @@ export default function SocialMedia() {
   const [showPostDetail, setShowPostDetail] = useState<string | null>(null)
   const [editPostId, setEditPostId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('accounts')
+  const [trendingLoading, setTrendingLoading] = useState(false)
+  const [trendingLastRefresh, setTrendingLastRefresh] = useState<Date | null>(null)
 
   // Account form
   const [af, setAf] = useState({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
@@ -419,6 +422,28 @@ export default function SocialMedia() {
     setShowNewPost(true)
   }
 
+  const handleRefreshTrending = useCallback(async () => {
+    setTrendingLoading(true)
+    try {
+      await refreshTrendingTopics()
+      setTrendingLastRefresh(new Date())
+    } finally {
+      setTrendingLoading(false)
+    }
+  }, [refreshTrendingTopics])
+
+  // Auto-refresh trending when tab is active
+  useEffect(() => {
+    if (activeTab !== 'trending') return
+    // Refresh if no data or last refresh was > 10 min ago
+    const shouldRefresh = trendingTopics.length === 0 ||
+      (trendingLastRefresh && Date.now() - trendingLastRefresh.getTime() > 10 * 60 * 1000) ||
+      !trendingLastRefresh
+    if (shouldRefresh) {
+      handleRefreshTrending()
+    }
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePublish = (id: string) => {
     updateSocialPost(id, { status: 'published', published_at: new Date().toISOString(), views: Math.floor(Math.random() * 5000) + 100 })
   }
@@ -447,7 +472,7 @@ export default function SocialMedia() {
         <TabsList>
           <TabsTrigger value="accounts" className="gap-1.5"><Users className="w-4 h-4" />账号管理</TabsTrigger>
           <TabsTrigger value="content" className="gap-1.5"><Edit3 className="w-4 h-4" />内容管理</TabsTrigger>
-          <TabsTrigger value="trending" className="gap-1.5"><TrendingUp className="w-4 h-4" />热点追踪</TabsTrigger>
+          <TabsTrigger value="trending" className="gap-1.5"><TrendingUp className="w-4 h-4" />热点素材</TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="w-4 h-4" />数据分析</TabsTrigger>
         </TabsList>
 
@@ -589,43 +614,83 @@ export default function SocialMedia() {
 
         {/* ========== Trending ========== */}
         <TabsContent value="trending">
-          <div className="grid gap-4 md:grid-cols-2">
-            {['weibo', 'douyin', 'zhihu', 'bilibili'].map(platform => {
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-orange-500" />
+              <h3 className="text-lg font-semibold">实时热点素材</h3>
+              {trendingLastRefresh && (
+                <span className="text-xs text-gray-400">
+                  更新于 {format(trendingLastRefresh, 'HH:mm')}
+                </span>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshTrending}
+              disabled={trendingLoading}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${trendingLoading ? 'animate-spin' : ''}`} />
+              {trendingLoading ? '抓取中...' : '刷新热点'}
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {['weibo', 'bilibili', 'baidu', 'zhihu', 'douyin', 'toutiao'].map(platform => {
               const topics = trendingTopics.filter(t => t.platform === platform)
               const pi = platformIcons[platform]
+              const pName = platformNames[platform] || platform
               if (!pi) return null
               return (
-                <Card key={platform}>
-                  <CardHeader className="pb-2">
+                <Card key={platform} className="overflow-hidden">
+                  <CardHeader className="pb-2 bg-gradient-to-r from-gray-50 to-white">
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded ${pi.bg} ${pi.color} font-bold`}>{pi.icon}</span>
-                      <CardTitle className="text-sm">热点话题</CardTitle>
+                      <CardTitle className="text-sm">{pName}热搜</CardTitle>
                       <Badge variant="secondary" className="text-[10px] ml-auto">{topics.length} 条</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {topics.map((topic, i) => (
-                        <div key={topic.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                          <span className={`text-sm font-bold w-5 ${i < 3 ? 'text-red-500' : 'text-gray-400'}`}>{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{topic.title}</p>
+                  <CardContent className="p-3">
+                    {trendingLoading && topics.length === 0 ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {topics.map((topic, i) => (
+                          <div key={topic.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer group">
+                            <span className={`text-xs font-bold w-5 text-center ${i < 3 ? 'text-red-500' : 'text-gray-400'}`}>{i + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate group-hover:text-blue-600 transition-colors">{topic.title}</p>
+                              {topic.description && (
+                                <p className="text-[10px] text-gray-400 truncate">{topic.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleWriteFromTrending(topic.title)}
+                                className="text-[10px] text-amber-500 hover:text-amber-600 px-1 py-0.5 rounded hover:bg-amber-50 transition-colors opacity-0 group-hover:opacity-100"
+                                title="写文案"
+                              >✨写文案</button>
+                              {topic.trend === 'up' && <ArrowUpRight className="w-3 h-3 text-red-500" />}
+                              {topic.trend === 'down' && <TrendingDown className="w-3 h-3 text-green-500" />}
+                              {topic.trend === 'stable' && <Minus className="w-3 h-3 text-gray-400" />}
+                              <span className="text-[10px] text-gray-400">{topic.heat > 10000 ? `${(topic.heat / 10000).toFixed(1)}万` : topic.heat}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => handleWriteFromTrending(topic.title)} className="text-xs text-amber-500 hover:text-amber-600 whitespace-nowrap px-1.5 py-0.5 rounded hover:bg-amber-50 transition-colors" title="写文案">✨ 写文案</button>
-                            {topic.trend === 'up' && <ArrowUpRight className="w-3 h-3 text-red-500" />}
-                            {topic.trend === 'down' && <TrendingDown className="w-3 h-3 text-green-500" />}
-                            {topic.trend === 'stable' && <Minus className="w-3 h-3 text-gray-400" />}
-                            <Badge variant="secondary" className="text-[10px]">{topic.heat}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                      {topics.length === 0 && <p className="text-xs text-gray-400 text-center py-2">暂无数据</p>}
-                    </div>
+                        ))}
+                        {topics.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-4">暂无数据，点击刷新获取</p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )
             })}
+          </div>
+          <div className="mt-3 text-center">
+            <p className="text-xs text-gray-400">💡 点击「刷新热点」抓取各平台实时热搜，点击「✨写文案」可快速基于热点创作</p>
           </div>
         </TabsContent>
 
