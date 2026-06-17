@@ -140,7 +140,7 @@ export default function ProjectManagement() {
     addTask, updateTask, deleteTask,
     addProject, updateProject, deleteProject,
     addDocument, updateDocument, deleteDocument,
-    uploadFile, deleteFile, moveFile,
+    fetchFiles, uploadFile, deleteFile, moveFile,
   } = useStore()
 
   // ========== Tab State ==========

@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from '@/store'
 import MainLayout from '@/components/layouts/MainLayout'
@@ -85,23 +86,23 @@ export default function App() {
     <Router basename={import.meta.env.VITE_BASE_PATH?.replace(/\/$/, '') || undefined}>
       <Routes>
         {/* 公开路由 - 已登录则跳转 */}
-        <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Login /></Suspense></RedirectIfAuth>} />
-        <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><Register /></Suspense></RedirectIfAuth>} />
-        <Route path="/invite/:token" element={<Suspense fallback={<LoadingFallback />}><Invite /></Suspense>} />
+        <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Login /></ErrorBoundary></Suspense></RedirectIfAuth>} />
+        <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Register /></ErrorBoundary></Suspense></RedirectIfAuth>} />
+        <Route path="/invite/:token" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Invite /></Suspense></ErrorBoundary>} />
 
         {/* 受保护路由 */}
         <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Suspense fallback={<LoadingFallback />}><Dashboard /></Suspense>} />
-          <Route path="ai" element={<Suspense fallback={<LoadingFallback />}><AIAssistant /></Suspense>} />
-          <Route path="project-management" element={<Suspense fallback={<LoadingFallback />}><ProjectManagement /></Suspense>} />
-          <Route path="collaboration" element={<Suspense fallback={<LoadingFallback />}><Collaboration /></Suspense>} />
-          <Route path="crm" element={<Suspense fallback={<LoadingFallback />}><CRM /></Suspense>} />
-          <Route path="social-media" element={<Suspense fallback={<LoadingFallback />}><SocialMedia /></Suspense>} />
+          <Route path="dashboard" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Dashboard /></Suspense></ErrorBoundary>} />
+          <Route path="ai" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AIAssistant /></Suspense></ErrorBoundary>} />
+          <Route path="project-management" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ProjectManagement /></Suspense></ErrorBoundary>} />
+          <Route path="collaboration" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Collaboration /></Suspense></ErrorBoundary>} />
+          <Route path="crm" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><CRM /></Suspense></ErrorBoundary>} />
+          <Route path="social-media" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><SocialMedia /></Suspense></ErrorBoundary>} />
           // projects route merged into project-management
-          <Route path="projects/:id" element={<Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense>} />
-          <Route path="video-conference" element={<Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense>} />
-          <Route path="settings" element={<Suspense fallback={<LoadingFallback />}><Settings /></Suspense>} />
+          <Route path="projects/:id" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense></ErrorBoundary>} />
+          <Route path="video-conference" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense></ErrorBoundary>} />
+          <Route path="settings" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Settings /></Suspense></ErrorBoundary>} />
         </Route>
 
         {/* 404 */}

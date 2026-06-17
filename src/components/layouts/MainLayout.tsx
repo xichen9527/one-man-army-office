@@ -77,12 +77,16 @@ export default function MainLayout() {
           <button
             onClick={() => { setCollapsed(!collapsed); setMobileMenuOpen(false) }}
             className="hidden lg:flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 text-gray-400"
+            aria-label="展开/收起侧边栏"
+            title="展开/收起侧边栏"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setMobileMenuOpen(false)}
             className="lg:hidden text-gray-400"
+            aria-label="关闭菜单"
+            title="关闭菜单"
           >
             <X className="w-5 h-5" />
           </button>
@@ -156,6 +160,8 @@ export default function MainLayout() {
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+              aria-label="打开菜单"
+              title="打开菜单"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -181,12 +187,14 @@ export default function MainLayout() {
               size="icon"
               className="h-8 w-8"
               onClick={() => setSearchOpen(!searchOpen)}
+              aria-label="搜索"
+              title="搜索"
             >
               <Search className="w-4 h-4 text-gray-500" />
             </Button>
 
             {/* Theme toggle */}
-            <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex" aria-label="深色模式" title="深色模式">
               <Moon className="w-4 h-4 text-gray-500" />
             </Button>
 
@@ -197,6 +205,8 @@ export default function MainLayout() {
                 size="icon"
                 className="h-8 w-8 relative"
                 onClick={() => setNotifOpen(!notifOpen)}
+                aria-label="通知"
+                title="通知"
               >
                 <Bell className="w-4 h-4 text-gray-500" />
                 {unreadCount > 0 && (
