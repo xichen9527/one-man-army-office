@@ -1,4 +1,5 @@
 // Supabase Edge Function: 生成 LiveKit Room Token
+// 从数据库读取用户的 LiveKit 配置
 // 文件路径: supabase/functions/livekit-token/index.ts
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -27,7 +28,7 @@ serve(async (req) => {
     // 验证用户身份
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', // 使用 service role key 读取配置表
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
@@ -49,15 +50,34 @@ serve(async (req) => {
       )
     }
 
-    // LiveKit 配置（从环境变量读取）
-    const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY')
-    const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET')
-    const livekitUrl = Deno.env.get('LIVEKIT_URL') // 如: https://your-project.livekit.cloud
+    // 从数据库读取用户的 LiveKit 配置
+    const { data: config, error: configError } = await supabaseClient
+      .from('video_conference_configs')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (configError || !config) {
+      return new Response(
+        JSON.stringify({
+          error: 'LiveKit not configured. Please configure it in Settings -> Video Conference.',
+          code: 'CONFIG_NOT_FOUND'
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const livekitUrl = config.server_url
+    const livekitApiKey = config.api_key
+    const livekitApiSecret = config.api_secret
 
     if (!livekitApiKey || !livekitApiSecret || !livekitUrl) {
       return new Response(
-        JSON.stringify({ error: 'LiveKit not configured. Please set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL in Supabase secrets.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error: 'Incomplete LiveKit configuration. Please check your settings.',
+          code: 'CONFIG_INCOMPLETE'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
