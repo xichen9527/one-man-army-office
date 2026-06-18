@@ -78,6 +78,11 @@ export default function VideoConference() {
   const [selectedParticipants, setSelectedParticipants] = useState<Array<{id: string; email: string; full_name: string}>>([])
   const [searchingParticipants, setSearchingParticipants] = useState(false)
 
+  // 加入会议（输入会议号）
+  const [showJoinDialog, setShowJoinDialog] = useState(false)
+  const [joinMeetingCode, setJoinMeetingCode] = useState('')
+  const [joinMeetingName, setJoinMeetingName] = useState('')
+
   const searchParticipants = async (query: string) => {
     setParticipantSearch(query)
     if (!query.trim() || query.length < 2) { setSearchResults([]); return }
@@ -355,6 +360,9 @@ export default function VideoConference() {
           <Button variant="ghost" size="icon" onClick={() => setShowApiConfig(true)} title="API 配置">
             <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           </Button>
+          <Button variant="outline" onClick={() => setShowJoinDialog(true)}>
+            <Link2 className="w-4 h-4 mr-1" />加入会议
+          </Button>
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-500">
           <span className="flex items-center gap-1"><Video className="w-4 h-4 text-green-500" />进行中: {ongoing.length}</span>
@@ -517,6 +525,91 @@ export default function VideoConference() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Join meeting dialog */}
+      <Dialog open={showJoinDialog} onOpenChange={(open) => { if (!open) { setShowJoinDialog(false); setJoinMeetingCode(''); setJoinMeetingName('') } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>加入会议</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">您的名称</label>
+              <Input
+                placeholder="输入您的名称"
+                value={joinMeetingName}
+                onChange={e => setJoinMeetingName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">会议号</label>
+              <Input
+                placeholder="输入9位数字会议号，如 123-456-789"
+                value={joinMeetingCode}
+                onChange={e => {
+                  // 只允许数字和横线，最多12字符（9位数字+2个横线）
+                  const v = e.target.value.replace(/[^\d-]/g, '').slice(0, 12)
+                  setJoinMeetingCode(v)
+                }}
+                className="text-center font-mono text-lg tracking-wider"
+                maxLength={12}
+              />
+              <p className="text-[10px] text-gray-400 mt-1.5">输入腾讯会议/飞书等平台的会议号</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span>或通过链接加入</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">会议链接（可选）</label>
+              <Input
+                placeholder="粘贴会议链接，如 https://meeting.qq.com/dm/..."
+                value={''}
+                readOnly
+                className="text-sm"
+              />
+              <p className="text-[10px] text-gray-400 mt-1.5">即将支持粘贴链接自动解析会议号</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowJoinDialog(false)}>取消</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              disabled={!joinMeetingCode.replace(/-/g, '')}
+              onClick={() => {
+                const code = joinMeetingCode.replace(/-/g, '')
+                if (code.length < 6) return
+                const stored = localStorage.getItem('video_conference_api')
+                let baseUrl = 'https://meeting.qq.com'
+                if (stored) {
+                  try {
+                    const cfg = JSON.parse(stored)
+                    if (cfg.provider === 'tencent') baseUrl = 'https://meeting.qq.com'
+                    else if (cfg.provider === 'feishu') baseUrl = 'https://feishu.cn'
+                    else if (cfg.baseUrl) baseUrl = cfg.baseUrl
+                  } catch {}
+                }
+                // Open meeting provider page in new tab
+                let joinUrl = ''
+                if (baseUrl.includes('qq.com')) {
+                  joinUrl = `https://meeting.qq.com/dm/${code}`
+                } else if (baseUrl.includes('feishu')) {
+                  joinUrl = `https://vc.feishu.cn/j/${code}`
+                } else {
+                  joinUrl = `${baseUrl}/${code}`
+                }
+                window.open(joinUrl, '_blank')
+                setShowJoinDialog(false)
+                setJoinMeetingCode('')
+                setJoinMeetingName('')
+                toast({ title: '已打开会议链接', description: `会议号 ${code} 已在新窗口中打开` })
+              }}
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              加入会议
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New meeting dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>

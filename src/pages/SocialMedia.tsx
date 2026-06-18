@@ -861,11 +861,11 @@ export default function SocialMedia() {
 
       {/* New post dialog */}
       <Dialog open={showNewPost} onOpenChange={setShowNewPost}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
           <DialogHeader><DialogTitle>创建内容</DialogTitle></DialogHeader>
-          <div className="flex gap-6 min-h-[400px]">
+          <div className="flex gap-6 min-h-[480px]">
             {/* 左侧：预览区 */}
-            <div className="w-2/5 border rounded-lg p-4 bg-gray-50">
+            <div className="w-2/5 border rounded-lg p-4 bg-gray-50 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-gray-500">📱 内容预览</span>
                 {selectedPlatforms.length > 0 && (
@@ -874,24 +874,36 @@ export default function SocialMedia() {
                   </Badge>
                 )}
               </div>
-              <div className="bg-white rounded-lg border p-4 min-h-[320px]">
+              <div className="bg-white rounded-lg border p-4 flex-1 overflow-y-auto">
                 {!pf.title && !pf.content && mediaFiles.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-300 text-sm">
-                    填写内容后预览效果
+                  <div className="flex flex-col items-center justify-center h-full text-gray-300 text-sm gap-2">
+                    <svg className="w-12 h-12 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span>在右侧填写内容后</span>
+                    <span>这里将实时显示预览效果</span>
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {/* 平台标识 */}
+                    {selectedPlatforms.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        {selectedPlatforms.slice(0, 4).map(p => {
+                          const pi = platformIcons[p]
+                          return pi ? <span key={p} className={`text-xs px-1.5 py-0.5 rounded ${pi.bg} ${pi.color}`}>{pi.icon}</span> : null
+                        })}
+                        {selectedPlatforms.length > 4 && <span className="text-xs text-gray-400">+{selectedPlatforms.length - 4}</span>}
+                      </div>
+                    )}
                     {pf.title && (
                       <h3 className="text-base font-bold text-gray-800 leading-snug">{pf.title}</h3>
                     )}
                     {pf.content && (
                       <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                        {pf.content.length > 300 ? pf.content.slice(0, 300) + '...' : pf.content}
+                        {pf.content}
                       </div>
                     )}
                     {mediaPreviews.length > 0 && (
                       <div className="grid grid-cols-2 gap-1.5">
-                        {mediaPreviews.slice(0, 4).map((preview, idx) => (
+                        {mediaPreviews.slice(0, 6).map((preview, idx) => (
                           <div key={idx} className="relative rounded overflow-hidden bg-gray-100">
                             {mediaFiles[idx]?.type.startsWith('video/') ? (
                               <video src={preview} className="w-full h-24 object-cover" />
@@ -900,9 +912,9 @@ export default function SocialMedia() {
                             )}
                           </div>
                         ))}
-                        {mediaPreviews.length > 4 && (
+                        {mediaPreviews.length > 6 && (
                           <div className="flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded h-24">
-                            +{mediaPreviews.length - 4}
+                            +{mediaPreviews.length - 6}
                           </div>
                         )}
                       </div>
@@ -910,7 +922,7 @@ export default function SocialMedia() {
                     <div className="flex items-center gap-3 pt-2 border-t text-xs text-gray-400">
                       <span>{charCount} 字符</span>
                       <span>{mediaFiles.length} 媒体</span>
-                      {overLimit && <span className="text-red-500">内容超限</span>}
+                      {overLimit && <span className="text-red-500 font-medium">内容超限</span>}
                       {contentWarnings.length > 0 && <span className="text-amber-500">{contentWarnings.length} 条警告</span>}
                     </div>
                   </div>
@@ -918,7 +930,7 @@ export default function SocialMedia() {
               </div>
             </div>
             {/* 右侧：编辑/发布区 */}
-            <div className="w-3/5 space-y-3 overflow-y-auto max-h-[460px] pr-1">
+            <div className="w-3/5 space-y-3 overflow-y-auto max-h-[520px] pr-1">
             <div>
               <Input placeholder={titleRequired ? `标题（必填${strictTitleLimit > 0 ? `，${strictTitleLimit}字以内` : ''}）` : '标题（可选）'} value={pf.title} onChange={e => setPf({ ...pf, title: e.target.value })} />
               {titleOverLimit && <p className="text-[10px] text-red-500 mt-1">标题超出最严格限制 {strictTitleLimit} 字</p>}
