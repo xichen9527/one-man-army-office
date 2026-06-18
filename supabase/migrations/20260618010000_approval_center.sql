@@ -2,6 +2,14 @@
 -- 审批中心 (Approval Center)
 -- =====================================================
 
+-- 先创建 ID 生成函数（必须在表创建前）
+CREATE OR REPLACE FUNCTION gen_random_id()
+RETURNS TEXT AS $$
+BEGIN
+    RETURN substring(replace(replace(replace(gen_random_uuid()::text, '-', ''), 'a', 'x'), 'b', 'y') from 1 for 16);
+END;
+$$ LANGUAGE plpgsql;
+
 -- 创建审批表
 CREATE TABLE IF NOT EXISTS approvals (
     id              TEXT        PRIMARY KEY DEFAULT gen_random_id(),
@@ -30,14 +38,6 @@ CREATE TRIGGER approvals_updated_at
     BEFORE UPDATE ON approvals
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- gen_random_id()：生成短随机ID（text类型）
-CREATE OR REPLACE FUNCTION gen_random_id()
-RETURNS TEXT AS $$
-BEGIN
-    RETURN substring(replace(replace(replace(gen_random_uuid()::text, '-', ''), 'a', 'x'), 'b', 'y') from 1 for 16);
-END;
-$$ LANGUAGE plpgsql;
-
 -- =====================================================
 -- RLS (Row Level Security)
 -- =====================================================
@@ -46,7 +46,7 @@ ALTER TABLE approvals ENABLE ROW LEVEL SECURITY;
 -- 策略：requester 可以查看自己的审批
 CREATE POLICY "approvals_requester_read"
     ON approvals FOR SELECT
-    USING (requester_id = auth.uid());
+    USING (requester_id = auth.uid()::text);
 
 -- 策略：admin 角色可以查看所有审批
 CREATE POLICY "approvals_admin_read_all"
@@ -54,7 +54,7 @@ CREATE POLICY "approvals_admin_read_all"
     USING (
         EXISTS (
             SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
+            WHERE profiles.id = auth.uid()::text
               AND profiles.role = 'admin'
         )
     );
@@ -62,7 +62,7 @@ CREATE POLICY "approvals_admin_read_all"
 -- 策略：任何已登录用户可以插入审批（requester）
 CREATE POLICY "approvals_insert"
     ON approvals FOR INSERT
-    WITH CHECK (requester_id = auth.uid());
+    WITH CHECK (requester_id = auth.uid()::text);
 
 -- 策略：admin 可以更新（审批通过/驳回）
 CREATE POLICY "approvals_admin_update"
@@ -70,7 +70,7 @@ CREATE POLICY "approvals_admin_update"
     USING (
         EXISTS (
             SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
+            WHERE profiles.id = auth.uid()::text
               AND profiles.role = 'admin'
         )
     );
@@ -79,7 +79,7 @@ CREATE POLICY "approvals_admin_update"
 CREATE POLICY "approvals_requester_delete_pending"
     ON approvals FOR DELETE
     USING (
-        requester_id = auth.uid()
+        requester_id = auth.uid()::text
         AND status = 'pending'
     );
 

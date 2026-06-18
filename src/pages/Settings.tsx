@@ -907,6 +907,18 @@ type AIAPIConfig = {
   isDefault: boolean
 }
 
+const AI_PROVIDERS = [
+  { name: 'OpenAI GPT-4o', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  { name: '硅基流动 (免费额度)', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+  { name: 'DeepSeek V3', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  { name: '阿里通义', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  { name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-2.0-flash' },
+  { name: 'Anthropic Claude', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-20250514' },
+  { name: '智谱 GLM-4', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  { name: 'Moonshot AI', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { name: '自定义 (Custom)', baseUrl: '', model: '' },
+]
+
 function AIModelSettings() {
   const [apis, setApis] = useState<AIAPIConfig[]>(() => {
     try {
@@ -915,10 +927,18 @@ function AIModelSettings() {
   })
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', baseUrl: '', apiKey: '', model: '' })
+  const [selectedProvider, setSelectedProvider] = useState(0)
+  const [customBaseUrl, setCustomBaseUrl] = useState('')
+  const [customModel, setCustomModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const [testing, setTesting] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null)
   const [saved, setSaved] = useState(false)
+
+  const provider = AI_PROVIDERS[selectedProvider]
+  const effectiveBaseUrl = selectedProvider === AI_PROVIDERS.length - 1 ? customBaseUrl : provider.baseUrl
+  const effectiveModel = selectedProvider === AI_PROVIDERS.length - 1 ? customModel : provider.model
+  const effectiveName = selectedProvider === AI_PROVIDERS.length - 1 ? '自定义' : provider.name
 
   const saveToLs = (configs: AIAPIConfig[]) => {
     localStorage.setItem('ai_api_configs', JSON.stringify(configs))
@@ -926,24 +946,35 @@ function AIModelSettings() {
   }
 
   const handleAdd = () => {
-    if (!form.name || !form.baseUrl || !form.apiKey || !form.model) return
+    if (!apiKey || !effectiveBaseUrl || !effectiveModel) return
+    const config = { id: editingId || `api-${Date.now()}`, name: effectiveName, baseUrl: effectiveBaseUrl, apiKey, model: effectiveModel, isDefault: editingId ? (apis.find(c => c.id === editingId)?.isDefault || false) : apis.length === 0 }
     const newConfigs = [...apis]
     if (editingId) {
       const idx = newConfigs.findIndex(c => c.id === editingId)
-      if (idx !== -1) newConfigs[idx] = { ...form, id: editingId, isDefault: newConfigs[idx].isDefault }
+      if (idx !== -1) newConfigs[idx] = config
     } else {
-      newConfigs.push({ ...form, id: `api-${Date.now()}`, isDefault: apis.length === 0 })
+      newConfigs.push(config)
     }
     saveToLs(newConfigs)
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', baseUrl: '', apiKey: '', model: '' })
+    setApiKey('')
+    setCustomBaseUrl('')
+    setCustomModel('')
+    setSelectedProvider(0)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   const handleEdit = (config: AIAPIConfig) => {
-    setForm({ name: config.name, baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model })
+    // Find matching provider or set to custom
+    const provIdx = AI_PROVIDERS.findIndex(p => p.baseUrl === config.baseUrl && p.model === config.model)
+    setSelectedProvider(provIdx >= 0 ? provIdx : AI_PROVIDERS.length - 1)
+    setApiKey(config.apiKey)
+    if (provIdx === AI_PROVIDERS.length - 1 || provIdx < 0) {
+      setCustomBaseUrl(config.baseUrl)
+      setCustomModel(config.model)
+    }
     setEditingId(config.id)
     setShowForm(true)
   }
@@ -1029,42 +1060,58 @@ function AIModelSettings() {
       {/* 新增/编辑表单 */}
       {showForm ? (
         <div className="space-y-3 p-4 rounded-lg border border-blue-200 bg-blue-50/50">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">连接名称 *</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="如：OpenAI GPT-4" className="h-8 text-sm mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs">默认模型 *</Label>
-              <Input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="如：gpt-4o、claude-3-opus" className="h-8 text-sm mt-1" />
-            </div>
-          </div>
+          {/* Step 1: 选择提供商 */}
           <div>
-            <Label className="text-xs">API Base URL * <span className="text-gray-400 font-normal">(OpenAI兼容格式)</span></Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Link className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <Input value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} placeholder="https://api.openai.com/v1" className="h-8 text-sm" />
-            </div>
-            <div className="flex gap-2 mt-1.5 flex-wrap">
-              {['https://api.openai.com/v1', 'https://open.aiapi.top/v1', 'https://api.siliconflow.cn/v1', 'https://api.deepseek.com/v1'].map(tmpl => (
-                <button key={tmpl} onClick={() => setForm(f => ({ ...f, baseUrl: tmpl }))} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors">{tmpl}</button>
+            <Label className="text-xs font-medium">1. 选择 AI 提供商</Label>
+            <div className="grid grid-cols-3 gap-1.5 mt-2">
+              {AI_PROVIDERS.map((p, idx) => (
+                <button
+                  key={p.name}
+                  onClick={() => setSelectedProvider(idx)}
+                  className={`flex flex-col items-center gap-0.5 p-2 rounded-lg border text-[10px] transition-colors ${selectedProvider === idx ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-blue-50'}`}
+                >
+                  <span className="font-medium truncate w-full text-center">{p.name}</span>
+                  {idx < AI_PROVIDERS.length - 1 && <span className="text-gray-300 truncate w-full text-center">{p.model}</span>}
+                </button>
               ))}
             </div>
           </div>
+          {/* Step 2: 自定义填URL/模型（仅自定义提供商） */}
+          {selectedProvider === AI_PROVIDERS.length - 1 && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">API Base URL *</Label>
+                <Input value={customBaseUrl} onChange={e => setCustomBaseUrl(e.target.value)} placeholder="https://your-api.com/v1" className="h-8 text-sm mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">模型名称 *</Label>
+                <Input value={customModel} onChange={e => setCustomModel(e.target.value)} placeholder="model-name" className="h-8 text-sm mt-1" />
+              </div>
+            </div>
+          )}
+          {/* 显示自动填入的信息 */}
+          {selectedProvider < AI_PROVIDERS.length - 1 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-xs text-gray-600">
+              <Link className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{effectiveBaseUrl}</span>
+              <span className="text-blue-500 shrink-0 ml-auto">{effectiveModel}</span>
+            </div>
+          )}
+          {/* Step 3: API Key */}
           <div>
-            <Label className="text-xs">API Key *</Label>
-            <Input type="password" value={form.apiKey} onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} placeholder="sk-..." className="h-8 text-sm mt-1" />
+            <Label className="text-xs font-medium">2. 输入 API Key *</Label>
+            <Input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." className="h-8 text-sm mt-1" />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={handleAdd} disabled={!form.name || !form.baseUrl || !form.apiKey || !form.model}>
+            <Button size="sm" onClick={handleAdd} disabled={!apiKey || !effectiveBaseUrl || !effectiveModel}>
               <Save className="w-3.5 h-3.5 mr-1" />{editingId ? '保存修改' : '添加连接'}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setForm({ name: '', baseUrl: '', apiKey: '', model: '' }) }}>取消</Button>
+            <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setApiKey(''); setCustomBaseUrl(''); setCustomModel(''); setSelectedProvider(0) }}>取消</Button>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => { setShowForm(true); setEditingId(null); setForm({ name: '', baseUrl: '', apiKey: '', model: '' }) }}>
+          <Button size="sm" onClick={() => { setShowForm(true); setEditingId(null); setApiKey(''); setCustomBaseUrl(''); setCustomModel(''); setSelectedProvider(0) }}>
             <Plus className="w-3.5 h-3.5 mr-1" />添加 API 连接
           </Button>
           {apis.length === 0 && (
@@ -1074,39 +1121,6 @@ function AIModelSettings() {
       )}
 
       {saved && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />已保存</p>}
-
-      {/* 快速配置 */}
-      <div className="mt-4 p-3 rounded-lg bg-gray-50 border">
-        <p className="text-xs font-medium text-gray-700 mb-2">常用 API 一键配置 <span className="text-gray-400 font-normal">（点击自动填入表单）</span></p>
-        <div className="space-y-1.5 text-[10px]">
-          {[
-            { name: 'OpenAI GPT-4o', url: 'https://api.openai.com/v1', model: 'gpt-4o' },
-            { name: '硅基流动 (免费额度)', url: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
-            { name: 'DeepSeek V3', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
-            { name: '阿里通义', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-            { name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-2.0-flash' },
-            { name: 'Anthropic Claude', url: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-20250514' },
-            { name: '智谱 GLM-4', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
-            { name: 'Moonshot AI', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
-          ].map(item => (
-            <button
-              key={item.name}
-              onClick={() => {
-                setShowForm(true)
-                setEditingId(null)
-                setForm({ name: item.name, baseUrl: item.url, apiKey: '', model: item.model })
-              }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
-            >
-              <Bot className="w-3 h-3 shrink-0 text-gray-400" />
-              <span className="w-28 shrink-0 font-medium text-gray-600">{item.name}</span>
-              <span className="truncate text-gray-400">{item.url}</span>
-              <span className="text-blue-500 shrink-0 ml-auto">{item.model}</span>
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[10px] text-gray-400">只需补充 API Key 即可完成配置</p>
-      </div>
     </div>
   )
 }

@@ -329,7 +329,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      let query = supabase.from('documents').select('*').or(`creator_id.eq.${user.user.id}`).order('updated_at', { ascending: false })
+      let query = supabase.from('documents').select('*').order('updated_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
@@ -1182,7 +1182,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      let query = supabase.from('files').select('*').eq('uploaded_by', user.user.id).order('created_at', { ascending: false })
+      let query = supabase.from('files').select('*').order('created_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query

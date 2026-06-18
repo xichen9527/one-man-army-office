@@ -12,6 +12,7 @@ import {
   MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon,
   ClipboardCheck, CheckCircle2, XCircle, Clock
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import { toast } from '@/components/ui/toast'
