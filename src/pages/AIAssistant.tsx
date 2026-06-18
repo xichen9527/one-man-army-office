@@ -9,7 +9,7 @@ import {
   Plus, Send, Trash2, MessageSquare, Search, Sparkles, Bot,
   FileText, Languages, Globe, Image, PenTool, ChevronLeft,
   BarChart3, Menu, X, Copy, RotateCcw, Loader2, Download, Check,
-  BotIcon, Settings, ChevronDown
+  BotIcon, Settings, ChevronDown, AlertCircle, CheckCircle
 } from 'lucide-react'
 import { useStore } from '@/store'
 import ReactMarkdown from 'react-markdown'
@@ -454,6 +454,28 @@ export default function AIAssistant() {
                     <Sparkles className="w-12 h-12 mb-3 text-blue-300" />
                     <p className="font-medium text-gray-600">开始一段新的 AI 对话</p>
                     <p className="text-sm mt-1">输入您的问题或需求，我会尽力帮助您</p>
+                    {!apiStatus && (
+                      <div className="mt-6 w-full max-w-md">
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>AI 功能需要配置 API Key 才能使用</span>
+                        </div>
+                        <button
+                          onClick={() => navigate('/settings?tab=ai-models')}
+                          className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                        >
+                          <Settings className="w-4 h-4" />
+                          前往设置 AI 模型
+                        </button>
+                        <p className="mt-2 text-[10px] text-gray-400 text-center">支持 OpenAI、DeepSeek、硅基流动、通义千问等 OpenAI 兼容格式</p>
+                      </div>
+                    )}
+                    {apiStatus && (
+                      <div className="flex items-center gap-1.5 mt-3 text-xs text-green-600">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>{apiStatus.name} · {apiStatus.model}</span>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-4 justify-center">
                       {['写一篇营销文案', '翻译一段英文', '生成周报', '分析竞品'].map(hint => (
                         <button

@@ -20,6 +20,7 @@ import type {
   TeamMember, TeamMemberInsert, TeamMemberUpdate,
   Invitation, InvitationInsert, InvitationUpdate,
   DBFile, DBFileInsert, DBFileUpdate,
+  ApprovalRequest, ApprovalRequestInsert, ApprovalRequestUpdate, ApprovalStatus,
 } from '@/types/database'
 
 // ==================== Store State ====================
@@ -145,7 +146,13 @@ interface AppState {
   markNotificationRead: (id: string) => Promise<void>
   markAllNotificationsRead: () => Promise<void>
 
-  // Files
+  // Approvals
+  approvals: ApprovalRequest[]
+  fetchApprovals: () => Promise<void>
+  createApproval: (data: Omit<ApprovalRequestInsert, 'requester_id'>) => Promise<void>
+  approveRequest: (id: string) => Promise<void>
+  rejectRequest: (id: string) => Promise<void>
+  // Approvals
   files: DBFile[]
   fetchFiles: (projectId?: string, taskId?: string) => Promise<void>
   uploadFile: (file: File, projectId?: string, taskId?: string, onProgress?: (pct: number) => void) => Promise<DBFile | null>
@@ -198,7 +205,9 @@ export const useStore = create<AppState>((set, get) => ({
         get().fetchAIConversations()
         get().fetchTeamMembers()
         get().fetchInvitations()
+        get().fetchApprovals()
         get().fetchFiles()
+        get().fetchApprovals()
         get().fetchTrendingTopics()
         // 登录后自动建立 realtime 订阅
         get().subscribeToConferences()
@@ -238,6 +247,7 @@ export const useStore = create<AppState>((set, get) => ({
       projects: [], tasks: [], documents: [], channels: [], messages: {},
       notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [], socialPostPlatforms: [],
       conferences: [], customers: [], salesOpportunities: [], members: [], invitations: [], files: [],
+      approvals: [],
     })
   },
   updatePassword: async (newPassword) => {
@@ -734,6 +744,15 @@ export const useStore = create<AppState>((set, get) => ({
       return fullContent
     }
 
+    // 构建上下文消息（带历史记录，最多保留最近20条）
+    const historyMsgs = get().aiMessages[convId] || []
+    const contextMessages = historyMsgs
+      .filter((m: any) => m.content && m.role)
+      .slice(-20)
+      .map((m: any) => ({ role: m.role, content: m.content }))
+    // 追加当前用户消息
+    contextMessages.push({ role: 'user', content })
+
     let aiContent = ''
     let modelName = ''
     let streamOk = false
@@ -749,7 +768,7 @@ export const useStore = create<AppState>((set, get) => ({
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${activeConfig.apiKey}`,
           },
-          { model: activeConfig.model, messages: [{ role: 'user', content }] }
+          { model: activeConfig.model, messages: contextMessages }
         )
         streamOk = true
       } catch (e: any) {
@@ -768,7 +787,7 @@ export const useStore = create<AppState>((set, get) => ({
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          { messages: [{ role: 'user', content }] }
+          { messages: contextMessages }
         )
         modelName = 'system-default'
         streamOk = true
@@ -788,7 +807,7 @@ export const useStore = create<AppState>((set, get) => ({
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${activeConfig.apiKey}`,
             },
-            body: JSON.stringify({ model: activeConfig.model, messages: [{ role: 'user', content }], stream: false }),
+            body: JSON.stringify({ model: activeConfig.model, messages: contextMessages, stream: false }),
             signal: AbortSignal.timeout(60000),
           })
           const json = await resp.json()
@@ -1109,6 +1128,52 @@ export const useStore = create<AppState>((set, get) => ({
       await supabase.from('notifications').update({ read: true } as any).eq('user_id', user.user.id).eq('read', false)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, read: true })) }))
     } catch (e) { console.error('markAllNotificationsRead failed:', e) }
+  },
+
+  // ========== Approvals ==========
+  approvals: [],
+  fetchApprovals: async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const isAdmin = (get().currentUser?.role) === 'admin'
+      let query = supabase.from('approvals').select('*')
+      if (!isAdmin) {
+        query = query.eq('requester_id', user.user.id)
+      }
+      const { data, error } = await query.order('created_at', { ascending: false })
+      if (error) { console.error('fetchApprovals failed:', error); return }
+      set({ approvals: (data as ApprovalRequest[] | null) || [] })
+    } catch (e) { console.error('fetchApprovals failed:', e) }
+  },
+  createApproval: async (data) => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const { data: result, error } = await supabase.from('approvals').insert({ ...data, requester_id: user.user.id } as any).select().single()
+      if (error) { console.error('createApproval failed:', error); return }
+      if (result) set((s) => ({ approvals: [result as ApprovalRequest, ...s.approvals] }))
+    } catch (e) { console.error('createApproval failed:', e) }
+  },
+  approveRequest: async (id) => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const now = new Date().toISOString()
+      const { data, error } = await supabase.from('approvals').update({ status: 'approved' as ApprovalStatus, approver_id: user.user.id, resolved_at: now, updated_at: now } as any).eq('id', id).select().single()
+      if (error) { console.error('approveRequest failed:', error); return }
+      if (data) set((s) => ({ approvals: s.approvals.map((a: ApprovalRequest) => a.id === id ? data as ApprovalRequest : a) }))
+    } catch (e) { console.error('approveRequest failed:', e) }
+  },
+  rejectRequest: async (id) => {
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      if (!user.user) return
+      const now = new Date().toISOString()
+      const { data, error } = await supabase.from('approvals').update({ status: 'rejected' as ApprovalStatus, approver_id: user.user.id, resolved_at: now, updated_at: now } as any).eq('id', id).select().single()
+      if (error) { console.error('rejectRequest failed:', error); return }
+      if (data) set((s) => ({ approvals: s.approvals.map((a: ApprovalRequest) => a.id === id ? data as ApprovalRequest : a) }))
+    } catch (e) { console.error('rejectRequest failed:', e) }
   },
 
   // ========== Files ==========

@@ -1075,25 +1075,37 @@ function AIModelSettings() {
 
       {saved && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />已保存</p>}
 
-      {/* 快速参考 */}
+      {/* 快速配置 */}
       <div className="mt-4 p-3 rounded-lg bg-gray-50 border">
-        <p className="text-xs font-medium text-gray-700 mb-2">常用 API 快速配置</p>
-        <div className="space-y-1.5 text-[10px] text-gray-500">
+        <p className="text-xs font-medium text-gray-700 mb-2">常用 API 一键配置 <span className="text-gray-400 font-normal">（点击自动填入表单）</span></p>
+        <div className="space-y-1.5 text-[10px]">
           {[
             { name: 'OpenAI GPT-4o', url: 'https://api.openai.com/v1', model: 'gpt-4o' },
             { name: '硅基流动 (免费额度)', url: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
             { name: 'DeepSeek V3', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
             { name: '阿里通义', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-            { name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-1.5-flash' },
+            { name: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-2.0-flash' },
+            { name: 'Anthropic Claude', url: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-20250514' },
+            { name: '智谱 GLM-4', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+            { name: 'Moonshot AI', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
           ].map(item => (
-            <div key={item.name} className="flex items-center gap-2">
-              <Bot className="w-3 h-3 shrink-0" />
-              <span className="w-32 shrink-0">{item.name}</span>
-              <span className="truncate">{item.url}</span>
-              <span className="text-blue-600 shrink-0">{item.model}</span>
-            </div>
+            <button
+              key={item.name}
+              onClick={() => {
+                setShowForm(true)
+                setEditingId(null)
+                setForm({ name: item.name, baseUrl: item.url, apiKey: '', model: item.model })
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+            >
+              <Bot className="w-3 h-3 shrink-0 text-gray-400" />
+              <span className="w-28 shrink-0 font-medium text-gray-600">{item.name}</span>
+              <span className="truncate text-gray-400">{item.url}</span>
+              <span className="text-blue-500 shrink-0 ml-auto">{item.model}</span>
+            </button>
           ))}
         </div>
+        <p className="mt-2 text-[10px] text-gray-400">只需补充 API Key 即可完成配置</p>
       </div>
     </div>
   )

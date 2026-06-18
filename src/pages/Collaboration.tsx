@@ -9,12 +9,14 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus, Search,
   Trash2, Mail, Crown, Shield, UserCheck, ListTodo, FolderOpen, Edit3, X,
-  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon
+  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon,
+  ClipboardCheck, CheckCircle2, XCircle, Clock
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import { toast } from '@/components/ui/toast'
 import { format, parseISO, differenceInMinutes, isToday, isYesterday } from 'date-fns'
+import type { ApprovalStatus } from '@/types/database'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 const roleLabels: Record<string, string> = { admin: '管理员', manager: '经理', member: '成员' }
@@ -25,6 +27,7 @@ export default function Collaboration() {
     createChannel, updateChannel, deleteChannel, members, addMember, removeMember, tasks, projects,
     documents, files, fetchDocuments, fetchFiles,
     updateMessage, deleteMessage, addNotification,
+    approvals, fetchApprovals, approveRequest, rejectRequest,
   } = useStore()
 
   const [msgInput, setMsgInput] = useState('')
@@ -47,6 +50,9 @@ export default function Collaboration() {
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 })
   const mentionRef = useRef<HTMLDivElement>(null)
+
+  // Approval filter state
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalStatus | 'all'>('pending')
 
   // editing state
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
@@ -354,11 +360,123 @@ export default function Collaboration() {
     <div className="space-y-4">
       <Tabs defaultValue="chat" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="approvals" className="gap-1.5"><ClipboardCheck className="w-4 h-4" />审批中心</TabsTrigger>
           <TabsTrigger value="chat" className="gap-1.5"><MessageSquare className="w-4 h-4" />即时聊天</TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5"><Users className="w-4 h-4" />成员管理</TabsTrigger>
           <TabsTrigger value="tasks" className="gap-1.5"><ListTodo className="w-4 h-4" />协同任务</TabsTrigger>
           <TabsTrigger value="files" className="gap-1.5"><FileText className="w-4 h-4" />项目文件</TabsTrigger>
         </TabsList>
+
+        {/* ========== Approval Center ========== */}
+        <TabsContent value="approvals" className="mt-0">
+          <div className="space-y-4">
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1">
+              {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
+                <Button
+                  key={f}
+                  variant={approvalFilter === f ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setApprovalFilter(f)}
+                  className="text-xs"
+                >
+                  {f === 'pending' && <Clock className="w-3.5 h-3.5 mr-1" />}
+                  {f === 'approved' && <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}
+                  {f === 'rejected' && <XCircle className="w-3.5 h-3.5 mr-1" />}
+                  {f === 'all' && '全部'}
+                  {!['all'].includes(f) && {
+                    pending: '待审批',
+                    approved: '已通过',
+                    rejected: '已驳回',
+                  }[f]}
+                </Button>
+              ))}
+            </div>
+
+            {/* Approval Cards */}
+            {approvals
+              .filter(a => approvalFilter === 'all' || a.status === approvalFilter)
+              .map((approval) => (
+                <Card key={approval.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Type badge + status */}
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px]"
+                          >
+                            {{
+                              file_upload: '📄 文件上传',
+                              project_create: '📁 项目创建',
+                              task_assign: '📋 任务分配',
+                            }[approval.type]}
+                          </Badge>
+                          <Badge
+                            variant={approval.status === 'pending' ? 'outline' : approval.status === 'approved' ? 'default' : 'destructive'}
+                            className={`text-[10px] ${approval.status === 'approved' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
+                          >
+                            {approval.status === 'pending' ? '⏳ 待审批' : approval.status === 'approved' ? '✅ 已通过' : '❌ 已驳回'}
+                          </Badge>
+                        </div>
+
+                        {/* Title */}
+                        <h4 className="font-medium text-sm mt-1">{approval.title}</h4>
+
+                        {/* Description */}
+                        {approval.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{approval.description}</p>
+                        )}
+
+                        {/* Time info */}
+                        <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {format(parseISO(approval.created_at), 'yyyy-MM-dd HH:mm')}
+                          </span>
+                          {approval.resolved_at && (
+                            <span>
+                              处理于 {format(parseISO(approval.resolved_at), 'yyyy-MM-dd HH:mm')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action buttons (admin + pending only) */}
+                      {currentUser?.role === 'admin' && approval.status === 'pending' && (
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                            onClick={() => approveRequest(approval.id)}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />通过
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs"
+                            onClick={() => rejectRequest(approval.id)}
+                          >
+                            <XCircle className="w-3.5 h-3.5 mr-1" />驳回
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+            {approvals.filter(a => approvalFilter === 'all' || a.status === approvalFilter).length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <ClipboardCheck className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+                <p className="text-sm">暂无审批记录</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
         {/* ========== Chat ========== */}
         <TabsContent value="chat" className="mt-0">

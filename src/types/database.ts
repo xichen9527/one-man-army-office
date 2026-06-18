@@ -24,6 +24,7 @@ export interface Database {
       invitations: { Row: Invitation; Insert: InvitationInsert; Update: InvitationUpdate }
       files: { Row: DBFile; Insert: DBFileInsert; Update: DBFileUpdate }
       followups: { Row: Followup; Insert: FollowupInsert; Update: FollowupUpdate }
+      approvals: { Row: ApprovalRequest; Insert: ApprovalRequestInsert; Update: ApprovalRequestUpdate }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -178,6 +179,26 @@ export interface AIMessage {
 }
 export type AIMessageInsert = Omit<AIMessage, 'id' | 'created_at'>
 export type AIMessageUpdate = Partial<Omit<AIMessage, 'id' | 'conversation_id' | 'created_at'>>
+
+// ==================== Approvals ====================
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+export type ApprovalType = 'file_upload' | 'project_create' | 'task_assign'
+
+export interface ApprovalRequest {
+  id: string
+  requester_id: string
+  approver_id: string | null
+  type: ApprovalType
+  title: string
+  description: string | null
+  status: ApprovalStatus
+  metadata: Json
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+}
+export type ApprovalRequestInsert = Omit<ApprovalRequest, 'id' | 'created_at' | 'updated_at' | 'resolved_at'>
+export type ApprovalRequestUpdate = Partial<Omit<ApprovalRequest, 'id' | 'requester_id' | 'created_at' | 'updated_at'>>
 
 // ==================== Followups ====================
 export interface Followup {
