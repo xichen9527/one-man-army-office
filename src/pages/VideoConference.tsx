@@ -135,8 +135,24 @@ export default function VideoConference() {
   // 获取 LiveKit Token
   const getToken = async (roomName: string, action: 'join' | 'create'): Promise<{ token: string; url: string } | null> => {
     try {
+      // 从 localStorage 读取 LiveKit 配置，传给 Edge Function 以绕过数据库依赖
+      const savedConfig = localStorage.getItem(LIVEKIT_CONFIG_KEY)
+      let clientConfig = {}
+      if (savedConfig) {
+        try {
+          const parsed = JSON.parse(savedConfig)
+          if (parsed.url && parsed.apiKey && parsed.apiSecret) {
+            clientConfig = {
+              serverUrl: parsed.url,
+              apiKey: parsed.apiKey,
+              apiSecret: parsed.apiSecret,
+            }
+          }
+        } catch {}
+      }
+
       const { data, error } = await supabase.functions.invoke('livekit-token', {
-        body: { roomName, action },
+        body: { roomName, action, ...clientConfig },
       })
 
       if (error) throw error

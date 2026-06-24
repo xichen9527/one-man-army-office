@@ -1,6 +1,55 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// 【修复问题7】各平台热搜的本地 fallback 数据（当 Edge Function 无法获取实时数据时使用）
+const FALLBACK_TRENDING_DATA: TrendingItem[] = [
+  // 微博热搜 fallback
+  { title: '618购物节优惠攻略', heat: 2850000, url: 'https://s.weibo.com/weibo?q=618购物节优惠攻略', trend: 'up', platform: 'weibo', description: null },
+  { title: '全国多地高温预警', heat: 1920000, url: 'https://s.weibo.com/weibo?q=全国多地高温预警', trend: 'up', platform: 'weibo', description: null },
+  { title: '国产大飞机C919商业首航', heat: 1680000, url: 'https://s.weibo.com/weibo?q=国产大飞机C919商业首航', trend: 'up', platform: 'weibo', description: null },
+  { title: '端午假期旅游数据公布', heat: 1350000, url: 'https://s.weibo.com/weibo?q=端午假期旅游数据公布', trend: 'stable', platform: 'weibo', description: null },
+  { title: '人工智能最新政策解读', heat: 980000, url: 'https://s.weibo.com/weibo?q=人工智能最新政策解读', trend: 'stable', platform: 'weibo', description: null },
+  { title: '新能源汽车销量创新高', heat: 860000, url: 'https://s.weibo.com/weibo?q=新能源汽车销量创新高', trend: 'stable', platform: 'weibo', description: null },
+  { title: '毕业季就业形势分析', heat: 750000, url: 'https://s.weibo.com/weibo?q=毕业季就业形势分析', trend: 'stable', platform: 'weibo', description: null },
+  { title: '夏日清凉美食推荐', heat: 620000, url: 'https://s.weibo.com/weibo?q=夏日清凉美食推荐', trend: 'stable', platform: 'weibo', description: null },
+  { title: '世界杯预选赛最新战况', heat: 540000, url: 'https://s.weibo.com/weibo?q=世界杯预选赛最新战况', trend: 'stable', platform: 'weibo', description: null },
+  { title: '高考志愿填报指南', heat: 480000, url: 'https://s.weibo.com/weibo?q=高考志愿填报指南', trend: 'down', platform: 'weibo', description: null },
+  // B站热搜 fallback
+  { title: '原神4.0版本更新内容', heat: 5200000, url: 'https://search.bilibili.com/all?keyword=原神4.0版本更新内容', trend: 'up', platform: 'bilibili', description: null },
+  { title: '某国产动画电影口碑爆棚', heat: 3800000, url: 'https://search.bilibili.com/all?keyword=国产动画电影口碑爆棚', trend: 'up', platform: 'bilibili', description: null },
+  { title: '程序员副业赚钱指南', heat: 2900000, url: 'https://search.bilibili.com/all?keyword=程序员副业赚钱指南', trend: 'stable', platform: 'bilibili', description: null },
+  { title: '最新手机测评对比', heat: 2200000, url: 'https://search.bilibili.com/all?keyword=最新手机测评对比', trend: 'stable', platform: 'bilibili', description: null },
+  { title: '零基础学Python入门教程', heat: 1800000, url: 'https://search.bilibili.com/all?keyword=零基础学Python入门教程', trend: 'stable', platform: 'bilibili', description: null },
+  { title: '露营装备清单及选购', heat: 1500000, url: 'https://search.bilibili.com/all?keyword=露营装备清单及选购', trend: 'stable', platform: 'bilibili', description: null },
+  { title: 'Switch游戏推荐2024', heat: 1200000, url: 'https://search.bilibili.com/all?keyword=Switch游戏推荐2024', trend: 'stable', platform: 'bilibili', description: null },
+  { title: '自媒体运营干货分享', heat: 980000, url: 'https://search.bilibili.com/all?keyword=自媒体运营干货分享', trend: 'down', platform: 'bilibili', description: null },
+  { title: '健身增肌完整计划', heat: 750000, url: 'https://search.bilibili.com/all?keyword=健身增肌完整计划', trend: 'stable', platform: 'bilibili', description: null },
+  { title: '如何拍出好看的照片', heat: 620000, url: 'https://search.bilibili.com/all?keyword=如何拍出好看的照片', trend: 'stable', platform: 'bilibili', description: null },
+  // 百度热搜 fallback
+  { title: '全国经济半年报发布', heat: 3500000, url: 'https://www.baidu.com/s?wd=全国经济半年报发布', trend: 'up', platform: 'baidu', description: null },
+  { title: '最新房地产政策调整', heat: 2800000, url: 'https://www.baidu.com/s?wd=最新房地产政策调整', trend: 'up', platform: 'baidu', description: null },
+  { title: '暑期交通安全提示', heat: 2100000, url: 'https://www.baidu.com/s?wd=暑期交通安全提示', trend: 'stable', platform: 'baidu', description: null },
+  { title: '中小学暑期托管服务', heat: 1750000, url: 'https://www.baidu.com/s?wd=中小学暑期托管服务', trend: 'stable', platform: 'baidu', description: null },
+  { title: '数字经济发展新趋势', heat: 1400000, url: 'https://www.baidu.com/s?wd=数字经济发展新趋势', trend: 'stable', platform: 'baidu', description: null },
+  { title: '夏季用电高峰应对', heat: 1100000, url: 'https://www.baidu.com/s?wd=夏季用电高峰应对', trend: 'down', platform: 'baidu', description: null },
+  { title: '全国高校录取分数线', heat: 950000, url: 'https://www.baidu.com/s?wd=全国高校录取分数线', trend: 'stable', platform: 'baidu', description: null },
+  { title: '新版个人征信指南', heat: 780000, url: 'https://www.baidu.com/s?wd=新版个人征信指南', trend: 'stable', platform: 'baidu', description: null },
+  // 知乎热搜 fallback
+  { title: 'AI大模型如何在工作中应用', heat: 850000, url: 'https://www.zhihu.com/search?type=content&q=AI大模型如何在工作中应用', trend: 'up', platform: 'zhihu', description: null },
+  { title: '年轻人为什么开始反向消费', heat: 680000, url: 'https://www.zhihu.com/search?type=content&q=年轻人为什么开始反向消费', trend: 'stable', platform: 'zhihu', description: null },
+  { title: '远程办公效率提升方法', heat: 520000, url: 'https://www.zhihu.com/search?type=content&q=远程办公效率提升方法', trend: 'stable', platform: 'zhihu', description: null },
+  { title: '程序员35岁危机真的存在吗', heat: 450000, url: 'https://www.zhihu.com/search?type=content&q=程序员35岁危机', trend: 'stable', platform: 'zhihu', description: null },
+  // 抖音热搜 fallback
+  { title: '618直播间超值好物', heat: 6800000, url: 'https://www.douyin.com/hot', trend: 'up', platform: 'douyin', description: null },
+  { title: '夏日清凉穿搭技巧', heat: 4200000, url: 'https://www.douyin.com/hot', trend: 'up', platform: 'douyin', description: null },
+  { title: '宠物搞笑视频合集', heat: 3800000, url: 'https://www.douyin.com/hot', trend: 'stable', platform: 'douyin', description: null },
+  { title: '厨房小白也能做的美食', heat: 3200000, url: 'https://www.douyin.com/hot', trend: 'stable', platform: 'douyin', description: null },
+  // 今日头条 fallback
+  { title: '国际局势最新动态', heat: 2100000, url: 'https://www.toutiao.com/hot-event/', trend: 'up', platform: 'toutiao', description: null },
+  { title: '科技行业最新资讯', heat: 1800000, url: 'https://www.toutiao.com/hot-event/', trend: 'stable', platform: 'toutiao', description: null },
+  { title: '健康养生知识汇总', heat: 1500000, url: 'https://www.toutiao.com/hot-event/', trend: 'stable', platform: 'toutiao', description: null },
+]
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -279,6 +328,13 @@ serve(async (req) => {
         .flatMap(r => r.value)
     }
 
+    // 【修复问题7】如果所有平台都抓取失败（allItems 为空），使用本地 fallback 数据
+    const usedFallback = allItems.length === 0
+    if (usedFallback) {
+      console.warn('[get-trending-lists] 所有平台抓取失败，使用本地 fallback 数据')
+      allItems = FALLBACK_TRENDING_DATA
+    }
+
     // Store results in trending_topics table (upsert: delete old + insert new)
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -313,6 +369,7 @@ serve(async (req) => {
       count: allItems.length,
       platforms: [...new Set(allItems.map(i => i.platform))],
       items: allItems,
+      usedFallback, // 【修复】标识是否使用了 fallback 数据
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

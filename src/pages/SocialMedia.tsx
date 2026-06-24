@@ -88,7 +88,7 @@ export default function SocialMedia() {
   const [af, setAf] = useState({ platform: 'weibo', account_name: '', account_id: '', auto_sync: true })
 
   // Post form
-  const [pf, setPf] = useState({ title: '', content: '', account_id: '' })
+  const [pf, setPf] = useState({ title: '', content: '', account_id: '', summary: '', category: '', tags: '' })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]) // 多选平台
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduledTime, setScheduledTime] = useState('')
@@ -282,7 +282,7 @@ export default function SocialMedia() {
     }
 
     setShowNewPost(false)
-    setPf({ title: '', content: '', account_id: '' })
+    setPf({ title: '', content: '', account_id: '', summary: '', category: '', tags: '' })
     setSelectedPlatforms([])
     setScheduleEnabled(false)
     setScheduledTime('')
@@ -409,14 +409,14 @@ export default function SocialMedia() {
     }
 
     setShowNewPost(false)
-    setPf({ title: '', content: '', account_id: '' })
+    setPf({ title: '', content: '', account_id: '', summary: '', category: '', tags: '' })
     setSelectedPlatforms([])
     setScheduleEnabled(false)
     setScheduledTime('')
   }
 
   const handleWriteFromTrending = (topicTitle: string) => {
-    setPf({ title: '', content: `#${topicTitle}`, account_id: '' })
+    setPf({ title: '', content: `#${topicTitle}`, account_id: '', summary: '', category: '', tags: '' })
     setSelectedPlatforms(['weibo']) // 默认选择微博
     setActiveTab('content')
     setShowNewPost(true)
@@ -931,74 +931,8 @@ export default function SocialMedia() {
             </div>
             {/* 右侧：编辑/发布区 */}
             <div className="w-3/5 space-y-3 overflow-y-auto max-h-[520px] pr-1">
-            <div>
-              <Input placeholder={titleRequired ? `标题（必填${strictTitleLimit > 0 ? `，${strictTitleLimit}字以内` : ''}）` : '标题（可选）'} value={pf.title} onChange={e => setPf({ ...pf, title: e.target.value })} />
-              {titleOverLimit && <p className="text-[10px] text-red-500 mt-1">标题超出最严格限制 {strictTitleLimit} 字</p>}
-              {titleRequired && !pf.title.trim() && <p className="text-[10px] text-amber-500 mt-1">所选平台要求标题必填</p>}
-            </div>
-            <div className="relative">
-              <textarea placeholder="内容 *" value={pf.content} onChange={e => setPf({ ...pf, content: e.target.value })}
-                className="w-full min-h-[150px] border rounded-md p-3 text-sm resize-y outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
-              <div className="absolute bottom-2 left-3 pointer-events-none text-sm whitespace-pre-wrap break-all opacity-0 max-h-0 overflow-hidden">{highlightHashtags(pf.content)}</div>
-            </div>
 
-            {/* Platform-aware char limits & validation */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400 font-medium">内容字数：</span>
-                <span className={overLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>{charCount} 字{strictContentLimit < Infinity ? ` / ${strictContentLimit}` : ''}</span>
-              </div>
-              {selectedPlatforms.length > 0 ? (
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  {selectedPlatforms.map(p => {
-                    const rule = platformRules[p]
-                    if (!rule) return null
-                    const exceeded = charCount > rule.content.maxLength
-                    return (
-                      <div key={p} className={`flex items-center gap-1 ${exceeded ? 'text-red-500' : 'text-gray-400'}`}>
-                        <span>{rule.name}</span>
-                        <span className={exceeded ? 'font-medium' : ''}>{charCount}/{rule.content.maxLength}</span>
-                        {exceeded && <span>⚠️</span>}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-amber-500">请选择至少一个目标平台</p>
-              )}
-              {/* Content warnings */}
-              {contentWarnings.length > 0 && pf.content.length > 0 && (
-                <div className="space-y-0.5 mt-1">
-                  {contentWarnings.map((w, i) => <p key={i} className="text-[10px] text-amber-600">⚠️ {w}</p>)}
-                </div>
-              )}
-            </div>
-
-            {/* Image count limit */}
-            {strictImageLimit > 0 && mediaFiles.length > 0 && (
-              <div className="text-xs">
-                <span className={mediaFiles.length > strictImageLimit ? 'text-red-500 font-medium' : 'text-gray-400'}>
-                  已选 {mediaFiles.length} 张图片 / 最严格限制 {strictImageLimit} 张
-                </span>
-                {mediaFiles.length > strictImageLimit && <span className="text-red-500"> ⚠️ 部分平台图片数量超出限制</span>}
-              </div>
-            )}
-
-            {/* Video required warning */}
-            {anyVideoRequired && !mediaFiles.some(f => f.type.startsWith('video/')) && (
-              <div className="bg-red-50 rounded-lg p-2 text-xs text-red-700">
-                所选平台要求视频必填（如抖音、B站），请上传视频文件
-              </div>
-            )}
-
-            {/* Cover required warning */}
-            {anyCoverRequired && mediaFiles.length === 0 && (
-              <div className="bg-amber-50 rounded-lg p-2 text-xs text-amber-700">
-                所选平台要求封面图必填（如微信公众号、小红书、B站、今日头条）
-              </div>
-            )}
-
-            {/* 平台选择（支持多选）*/}
+            {/* 平台选择（支持多选）- 放在最前面 */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">目标平台 *</span>
@@ -1037,122 +971,252 @@ export default function SocialMedia() {
                 })}
               </div>
               {selectedPlatforms.length === 0 && (
-                <p className="text-xs text-amber-500">请至少选择一个目标平台</p>
+                <p className="text-xs text-amber-500">请至少选择一个目标平台，选择后编辑区将显示对应平台要求</p>
               )}
             </div>
 
-            {/* 平台发布须知（基于 platform-rules 配置）*/}
+            {/* ===== 根据平台动态渲染编辑字段 ===== */}
             {selectedPlatforms.length > 0 && (
-              <div className="bg-blue-50 rounded-lg p-3 text-xs space-y-2">
-                <p className="font-medium text-blue-700">📋 发布须知：</p>
-                {selectedPlatforms.map(p => {
-                  const rule = platformRules[p]
-                  if (!rule) return null
-                  return (
-                    <div key={p} className="space-y-0.5">
-                      <p className="font-medium text-blue-700">{rule.name}：</p>
-                      <ul className="text-blue-600 space-y-0.5 ml-2">
-                        {rule.tips.map((tip, i) => <li key={i}>• {tip}</li>)}
-                        {rule.images.coverRequired && <li>• 封面图必选（推荐 {rule.images.coverRecommendSize}）</li>}
-                        {rule.video.required && <li>• 视频必填（最长 {rule.video.maxLengthMin} 分钟）</li>}
-                        {rule.category.required && <li>• {rule.category.label}必选</li>}
-                        {rule.tags.required && <li>• {rule.tags.label}必填</li>}
-                        {rule.summary.required && <li>• 摘要必填（{rule.summary.maxLength} 字以内）</li>}
-                        {rule.music.supported && <li>• 支持添加背景音乐</li>}
-                      </ul>
+              <>
+                {/* 标题 - 根据平台要求显示 */}
+                {titleRequired && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      {selectedRules.length === 1 ? selectedRules[0].title.label : `标题（必填，${strictTitleLimit}字以内）`}
+                    </label>
+                    <Input 
+                      placeholder={selectedRules.length === 1 ? selectedRules[0].title.label : `标题（${strictTitleLimit}字以内）`} 
+                      value={pf.title} 
+                      onChange={e => setPf({ ...pf, title: e.target.value.slice(0, strictTitleLimit || undefined)})} 
+                    />
+                    <div className="flex justify-between mt-1">
+                      {titleOverLimit && <p className="text-[10px] text-red-500">标题超出限制 {strictTitleLimit} 字</p>}
+                      <span className={`text-[10px] ml-auto ${pf.title.length > strictTitleLimit ? 'text-red-500' : 'text-gray-400'}`}>{pf.title.length}{strictTitleLimit > 0 ? `/${strictTitleLimit}` : ''}</span>
                     </div>
-                  )
-                })}
-                {/* 敏感内容提醒 */}
-                {selectedPlatforms.some(p => platformRules[p]?.sensitiveTips.length > 0) && (
-                  <div className="border-t border-blue-200 pt-1 mt-1">
-                    <p className="font-medium text-red-600">⚠️ 注意事项：</p>
-                    {[...new Set(selectedPlatforms.flatMap(p => platformRules[p]?.sensitiveTips || []))].map((tip, i) => (
-                      <p key={i} className="text-red-600">• {tip}</p>
-                    ))}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* 媒体上传 */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">媒体内容</span>
-                <span className="text-xs text-gray-400">图片或视频（最多50MB/个）</span>
-              </div>
-              
-              {/* 已上传的媒体预览 */}
-              {mediaPreviews.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {mediaPreviews.map((preview, idx) => (
-                    <div key={idx} className="relative group">
-                      {mediaFiles[idx]?.type.startsWith('video/') ? (
-                        <video src={preview} className="w-full h-20 object-cover rounded-md bg-gray-100" />
-                      ) : (
-                        <img src={preview} className="w-full h-20 object-cover rounded-md" alt={`媒体${idx + 1}`} />
-                      )}
-                      <button
-                        onClick={() => handleRemoveMedia(idx)}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                      {mediaFiles[idx]?.type.startsWith('video/') && (
-                        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] flex items-center gap-0.5">
-                          <Video className="w-2.5 h-2.5" /> 视频
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* 上传按钮 */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*,video/*"
-                multiple
-                className="hidden"
-                onChange={handleMediaSelect}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-200 rounded-lg p-4 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors flex flex-col items-center gap-1"
-                disabled={uploadingMedia}
-              >
-                {uploadingMedia ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>上传中...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-5 h-5" />
-                    <span>点击上传图片或视频</span>
-                    <span className="text-[10px] text-gray-400">{selectedPlatforms.includes('douyin') || selectedPlatforms.includes('bilibili') ? '视频平台建议上传视频文件' : '支持 JPG、PNG、GIF、MP4 等格式'}</span>
-                  </>
+                {/* 摘要 - 微信公众号必填 */}
+                {selectedRules.some(r => r.summary.required) && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      {selectedRules.find(r => r.summary.required)?.summary.label || '摘要'}
+                    </label>
+                    <textarea 
+                      placeholder={selectedRules.find(r => r.summary.required)?.summary.label || '请输入摘要'}
+                      value={pf.summary} 
+                      onChange={e => {
+                        const maxLen = selectedRules.find(r => r.summary.maxLength)?.summary.maxLength || 999
+                        setPf({ ...pf, summary: e.target.value.slice(0, maxLen) })
+                      }}
+                      className="w-full min-h-[60px] border rounded-md p-2 text-sm resize-y outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                      rows={2}
+                    />
+                    <span className={`text-[10px] ${pf.summary.length > (selectedRules.find(r => r.summary.maxLength)?.summary.maxLength || 999) ? 'text-red-500' : 'text-gray-400'}`}>
+                      {pf.summary.length}/{selectedRules.find(r => r.summary.maxLength)?.summary.maxLength || '无限'}
+                    </span>
+                  </div>
                 )}
-              </button>
-            </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <Switch checked={scheduleEnabled} onCheckedChange={v => setScheduleEnabled(v)} />
-              定时发布
-            </label>
-            {scheduleEnabled && (
-              <div className="space-y-1">
-                <input type="datetime-local" value={scheduledTime}
-                  min={new Date().toISOString().slice(0, 16)}
-                  onChange={e => {
-                    if (new Date(e.target.value) >= new Date()) setScheduledTime(e.target.value)
-                  }}
-                  className="w-full border rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
-                <p className="text-[10px] text-gray-400">选择一个未来的时间进行定时发布</p>
-              </div>
+                {/* 分区/分类选择 - B站必选 */}
+                {anyCategoryRequired && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      {selectedRules.find(r => r.category.required)?.category.label || '分类'}
+                    </label>
+                    <select
+                      value={pf.category}
+                      onChange={e => setPf({ ...pf, category: e.target.value })}
+                      className="w-full border rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 bg-white"
+                    >
+                      <option value="">请选择{selectedRules.find(r => r.category.required)?.category.label || '分类'}</option>
+                      {selectedRules.filter(r => r.category.required).flatMap(r => r.category.options).filter((v, i, a) => a.indexOf(v) === i).map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    {!pf.category && <p className="text-[10px] text-amber-500 mt-1">所选平台要求选择分类</p>}
+                  </div>
+                )}
+
+                {/* 标签 - B站必填 */}
+                {anyTagsRequired && (
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">
+                      {selectedRules.find(r => r.tags.required)?.tags.label || '标签'}
+                    </label>
+                    <Input
+                      placeholder="用逗号分隔多个标签"
+                      value={pf.tags}
+                      onChange={e => setPf({ ...pf, tags: e.target.value })}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      最多 {selectedRules.find(r => r.tags.required)?.tags.maxCount || 12} 个标签
+                    </p>
+                  </div>
+                )}
+
+                {/* 内容文本区 - 根据平台调整 */}
+                <div className="relative">
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    {selectedRules.length === 1 
+                      ? selectedRules[0].content.label 
+                      : `内容（${strictContentLimit < Infinity ? `最严${strictContentLimit}字` : '不限字数'}）`}
+                  </label>
+                  <textarea 
+                    placeholder={selectedRules.length === 1 
+                      ? `${selectedRules[0].name}内容...` 
+                      : '请输入内容...'}
+                    value={pf.content} 
+                    onChange={e => setPf({ ...pf, content: e.target.value })}
+                    className="w-full min-h-[150px] border rounded-md p-3 text-sm resize-y outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" 
+                  />
+                  {/* 字数统计 - 按平台分别显示 */}
+                  <div className="mt-1 space-y-1">
+                    {selectedPlatforms.map(p => {
+                      const rule = platformRules[p]
+                      if (!rule) return null
+                      const exceeded = charCount > rule.content.maxLength
+                      return (
+                        <div key={p} className={`flex items-center justify-between text-xs ${exceeded ? 'text-red-500' : 'text-gray-400'}`}>
+                          <span>{rule.name}</span>
+                          <span className={exceeded ? 'font-medium' : ''}>{charCount}/{rule.content.maxLength} 字{exceeded && ' ⚠️'}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 媒体上传 - 根据平台提示 */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {anyVideoRequired ? '视频上传' : '媒体内容'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {anyVideoRequired 
+                        ? '视频必填'
+                        : strictImageLimit > 0 
+                          ? `图片最多${strictImageLimit}张` 
+                          : '图片或视频'}
+                    </span>
+                  </div>
+                  
+                  {/* 平台特定提示 */}
+                  {anyVideoRequired && !mediaFiles.some(f => f.type.startsWith('video/')) && (
+                    <div className="bg-red-50 rounded-lg p-2 text-xs text-red-700">
+                      所选平台要求视频必填（如抖音、B站），请上传视频文件
+                    </div>
+                  )}
+                  {anyCoverRequired && mediaFiles.length === 0 && (
+                    <div className="bg-amber-50 rounded-lg p-2 text-xs text-amber-700">
+                      所选平台要求封面图必填
+                    </div>
+                  )}
+                  
+                  {/* 已上传的媒体预览 */}
+                  {mediaPreviews.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {mediaPreviews.map((preview, idx) => (
+                        <div key={idx} className="relative group">
+                          {mediaFiles[idx]?.type.startsWith('video/') ? (
+                            <video src={preview} className="w-full h-20 object-cover rounded-md bg-gray-100" controls />
+                          ) : (
+                            <img src={preview} className="w-full h-20 object-cover rounded-md" alt={`媒体${idx + 1}`} />
+                          )}
+                          <button
+                            onClick={() => handleRemoveMedia(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {mediaFiles[idx]?.type.startsWith('video/') && (
+                            <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] flex items-center gap-0.5">
+                              <Video className="w-2.5 h-2.5" /> 视频
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* 上传按钮 */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*,video/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleMediaSelect}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-lg p-3 text-sm text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors flex flex-col items-center gap-1"
+                    disabled={uploadingMedia}
+                  >
+                    {uploadingMedia ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /><span>上传中...</span></>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5" />
+                        <span>{anyVideoRequired ? '上传视频文件' : '上传图片或视频'}</span>
+                        <span className="text-[10px] text-gray-400">
+                          {anyVideoRequired 
+                            ? '视频必填，建议竖屏9:16'
+                            : `图片最多${strictImageLimit || 9}张，支持 JPG/PNG/MP4`}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                  {strictImageLimit > 0 && mediaFiles.length > strictImageLimit && (
+                    <p className="text-[10px] text-red-500">⚠️ 部分平台图片数量超出限制（最严{strictImageLimit}张）</p>
+                  )}
+                </div>
+
+                {/* 平台发布须知（精简版）*/}
+                <details className="bg-blue-50 rounded-lg text-xs">
+                  <summary className="p-2 cursor-pointer font-medium text-blue-700">📋 发布须知</summary>
+                  <div className="px-3 pb-3 space-y-2">
+                    {selectedPlatforms.map(p => {
+                      const rule = platformRules[p]
+                      if (!rule) return null
+                      return (
+                        <div key={p} className="space-y-0.5">
+                          <p className="font-medium text-blue-700">{rule.name}：</p>
+                          <ul className="text-blue-600 space-y-0.5 ml-2">
+                            {rule.tips.map((tip, i) => <li key={i}>• {tip}</li>)}
+                          </ul>
+                        </div>
+                      )
+                    })}
+                    {selectedPlatforms.some(p => platformRules[p]?.sensitiveTips.length > 0) && (
+                      <div className="border-t border-blue-200 pt-1 mt-1">
+                        <p className="font-medium text-red-600">⚠️ 注意：</p>
+                        {[...new Set(selectedPlatforms.flatMap(p => platformRules[p]?.sensitiveTips || []))].map((tip, i) => (
+                          <p key={i} className="text-red-600">• {tip}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </details>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={scheduleEnabled} onCheckedChange={v => setScheduleEnabled(v)} />
+                  定时发布
+                </label>
+                {scheduleEnabled && (
+                  <div className="space-y-1">
+                    <input type="datetime-local" value={scheduledTime}
+                      min={new Date().toISOString().slice(0, 16)}
+                      onChange={e => {
+                        if (new Date(e.target.value) >= new Date()) setScheduledTime(e.target.value)
+                      }}
+                      className="w-full border rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300" />
+                    <p className="text-[10px] text-gray-400">选择一个未来的时间进行定时发布</p>
+                  </div>
+                )}
+              </>
             )}
-          </div>
+            </div>
           </div>
           {(publishError || publishSuccess) && (
             <div className={`text-xs rounded p-2 ${publishError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>

@@ -207,7 +207,6 @@ export const useStore = create<AppState>((set, get) => ({
         get().fetchInvitations()
         get().fetchApprovals()
         get().fetchFiles()
-        get().fetchApprovals()
         get().fetchTrendingTopics()
         // 登录后自动建立 realtime 订阅
         get().subscribeToConferences()
@@ -905,7 +904,10 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
-      if (!token) { console.error('refreshTrendingTopics: not authenticated'); return }
+      if (!token) { 
+        console.error('refreshTrendingTopics: not authenticated')
+        throw new Error('未登录，请先登录')
+      }
       const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-trending-lists`
       const res = await fetch(fnUrl, {
         method: 'POST',
@@ -916,10 +918,23 @@ export const useStore = create<AppState>((set, get) => ({
         },
         body: JSON.stringify({}),
       })
-      if (!res.ok) { console.error('refreshTrendingTopics: Edge Function error', res.status); return }
+      if (!res.ok) { 
+        console.error('refreshTrendingTopics: Edge Function error', res.status)
+        throw new Error(`Edge Function 调用失败: ${res.status}`)
+      }
+      const result = await res.json()
+      if (result.error) {
+        throw new Error(result.error)
+      }
       // Re-fetch from DB after refresh
       await get().fetchTrendingTopics()
-    } catch (e) { console.error('refreshTrendingTopics failed:', e) }
+      
+      // 返回结果，让前端知道是否使用了 fallback
+      return { success: true, usedFallback: result.usedFallback || false }
+    } catch (e) { 
+      console.error('refreshTrendingTopics failed:', e)
+      throw e
+    }
   },
   addSocialAccount: async (a) => {
     try {
@@ -1136,12 +1151,11 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: user } = await supabase.auth.getUser()
       if (!user.user) return
-      const isAdmin = (get().currentUser?.role) === 'admin'
-      let query = supabase.from('approvals').select('*')
-      if (!isAdmin) {
-        query = query.eq('requester_id', user.user.id)
-      }
-      const { data, error } = await query.order('created_at', { ascending: false })
+      // RLS 策略处理权限过滤，前端不做重复判断
+      const { data, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .order('created_at', { ascending: false })
       if (error) { console.error('fetchApprovals failed:', error); return }
       set({ approvals: (data as ApprovalRequest[] | null) || [] })
     } catch (e) { console.error('fetchApprovals failed:', e) }
@@ -1354,3 +1368,7 @@ supabase.auth.onAuthStateChange((event, session) => {
     useStore.getState().signOut()
   }
 })
+
+// 已移除 visibilitychange 监听器：此前注册的监听器会在页面切换回来时触发 loadUser()，
+// 导致 loading 状态变化从而引发页面级重新渲染（表现为页面刷新）。
+// 移除后切换到外部页面再切回时不再有任何刷新行为。

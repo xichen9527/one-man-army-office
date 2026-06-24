@@ -44,6 +44,7 @@ export default function Settings() {
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatar_url || '')
   
   // 密码强度状态
+  const [email, setEmail] = useState(currentUser?.email || '')
   const [newPassword, setNewPassword] = useState('')
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>('weak')
   const [strengthText, setStrengthText] = useState('')
@@ -379,6 +380,21 @@ export default function Settings() {
     const updates: Record<string, string> = {}
     if (fullName !== currentUser?.full_name) updates.full_name = fullName
     if (username !== currentUser?.username) updates.username = username
+    
+    // 更新邮箱（通过 auth API）
+    if (email !== currentUser?.email) {
+      try {
+        const { error: emailError } = await sb.auth.updateUser({ email })
+        if (emailError) {
+          alert('邮箱更新失败: ' + emailError.message)
+          return
+        }
+      } catch (e: any) {
+        alert('邮箱更新失败: ' + (e.message || '未知错误'))
+        return
+      }
+    }
+    
     if (Object.keys(updates).length > 0 && currentUser?.id) {
       await sb.from('profiles').update(updates).eq('id', currentUser.id)
       const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single()
@@ -565,8 +581,8 @@ export default function Settings() {
                   <Input
                     id="email"
                     type="email"
-                    value={currentUser?.email || ''}
-                    disabled
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
               </div>
@@ -990,9 +1006,39 @@ function AIModelSettings() {
     saveToLs(updated)
   }
 
+  // URL 有效性检测：确认 baseUrl 看起来像合法的 API endpoint
+  const isValidApiUrl = (url: string): { valid: boolean; warning?: string } => {
+    // 检查明显不是 API endpoint 的 URL（营销页、活动页等）
+    if (/volcengine\.com\/activity/i.test(url)) {
+      return { 
+        valid: false, 
+        warning: '检测到火山引擎/豆包活动页 URL，这不是有效的 API 地址。\n豆包 API 正确地址为：https://ark.cn-beijing.volces.com/api/v3\n\n请参考火山引擎文档获取正确的 API 地址。'
+      }
+    }
+    // 检查是否包含合法的 API 路径特征
+    const validPatterns = [/\/v1\b/, /\/v1beta\b/, /\/v2\b/, /\/api\//, /\/compatible-mode\//]
+    const hasValidPath = validPatterns.some(p => p.test(url))
+    if (!hasValidPath) {
+      return {
+        valid: false,
+        warning: `URL "${url}" 看起来不像合法的 API endpoint。\n确保地址包含 API 路径（如 /v1），示例格式：\nhttps://api.example.com/v1`
+      }
+    }
+    return { valid: true }
+  }
+
   const handleTest = async (config: AIAPIConfig) => {
     setTesting(config.id)
     setTestResult(null)
+    
+    // 1. 先验证 URL 合法性
+    const urlCheck = isValidApiUrl(config.baseUrl)
+    if (!urlCheck.valid) {
+      setTestResult({ id: config.id, ok: false, msg: urlCheck.warning || 'URL 格式不正确' })
+      setTesting(null)
+      return
+    }
+    
     try {
       const resp = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST',
@@ -1004,7 +1050,15 @@ function AIModelSettings() {
         setTestResult({ id: config.id, ok: true, msg: '连接成功 ✅' })
       } else {
         const err = await resp.json().catch(() => ({}))
-        setTestResult({ id: config.id, ok: false, msg: `失败: ${err.error?.message || resp.statusText || resp.status}` })
+        const errMsg = err.error?.message || ''
+        // 对常见的余额不足问题给出友好提示
+        if (/balance|余额|quota|credit|insufficient/i.test(errMsg)) {
+          setTestResult({ id: config.id, ok: false, msg: `API 连接正常，但账户余额不足：${errMsg}\n请前往服务商控制台充值后重试。` })
+        } else if (resp.status === 401 || resp.status === 403) {
+          setTestResult({ id: config.id, ok: false, msg: `认证失败（HTTP ${resp.status}）：API Key 无效或权限不足，请检查 Key 是否正确。` })
+        } else {
+          setTestResult({ id: config.id, ok: false, msg: `失败（HTTP ${resp.status}）：${errMsg || resp.statusText || '未知错误'}` })
+        }
       }
     } catch (e: any) {
       setTestResult({ id: config.id, ok: false, msg: `连接失败: ${e.message || '网络错误'}` })

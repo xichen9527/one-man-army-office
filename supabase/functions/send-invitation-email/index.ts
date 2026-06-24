@@ -1,10 +1,18 @@
+// Supabase Edge Function: 发送团队邀请邮件
+// 文件路径: supabase/functions/send-invitation-email/index.ts
+// 【修复问题5】
+//   1. APP_URL 默认值改为 GitHub Pages 地址
+//   2. 发件人地址从 invite@resend.dev 改为 onboarding@resend.dev（Resend 默认可用）
+//   3. 添加更友好的错误提示
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Resend } from 'https://esm.sh/resend@3.2.0'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const APP_NAME = '一人成军办公平台'
-const APP_URL = Deno.env.get('APP_URL') || 'https://jikjcdrrcywnwmtaabzh.supabase.co'
+// 【修复】默认地址改为 GitHub Pages 地址
+const APP_URL = Deno.env.get('APP_URL') || 'https://xichen9527.github.io/one-man-army-office'
 
 serve(async (req) => {
   // CORS preflight
@@ -21,7 +29,16 @@ serve(async (req) => {
     const { email, inviterName, inviteeRole, token, appName } = await req.json()
 
     if (!email || !token) {
-      return new Response(JSON.stringify({ error: '缺少必要参数' }), {
+      return new Response(JSON.stringify({ error: '缺少必要参数', message: '请提供邮箱地址和邀请 Token' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      })
+    }
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return new Response(JSON.stringify({ error: '邮箱格式不正确', message: `邮箱地址 "${email}" 格式无效` }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       })
@@ -120,8 +137,9 @@ ${inviteUrl}
       })
     }
 
+    // 【修复】使用 onboarding@resend.dev 作为发件人（Resend 默认可用，支持发送到任意邮箱）
     const { data, error } = await resend.emails.send({
-      from: `${platform} <invite@resend.dev>`,
+      from: `${platform} <onboarding@resend.dev>`,
       to: [email],
       subject: `【${platform}】您收到了来自 ${inviterName} 的团队邀请`,
       html: htmlContent,
@@ -130,11 +148,22 @@ ${inviteUrl}
 
     if (error) {
       console.error('Resend error:', error)
-      return new Response(JSON.stringify({ error: error.message }), {
+      // 【修复】提供更友好的错误提示
+      const friendlyMessage = error.message?.includes('not authorized')
+        ? '发件人邮箱未在 Resend 平台验证，请检查 RESEND_API_KEY 配置'
+        : error.message?.includes('rate limit')
+          ? '邮件发送频率超限，请稍后再试'
+          : `邮件发送失败: ${error.message}`
+      return new Response(JSON.stringify({
+        error: friendlyMessage,
+        detail: error.message
+      }), {
         status: 500,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       })
     }
+
+    console.log(`[send-invitation-email] 成功发送邀请邮件到: ${email}, emailId: ${data?.id}`)
 
     return new Response(JSON.stringify({
       success: true,
@@ -145,7 +174,7 @@ ${inviteUrl}
     })
   } catch (err) {
     console.error('Function error:', err)
-    return new Response(JSON.stringify({ error: '服务器内部错误' }), {
+    return new Response(JSON.stringify({ error: '服务器内部错误', message: String(err) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     })
