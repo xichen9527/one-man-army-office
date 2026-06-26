@@ -389,6 +389,8 @@ export default function Settings() {
           alert('邮箱更新失败: ' + emailError.message)
           return
         }
+        // 友好提示：Supabase 会自动发送确认邮件到新邮箱
+        alert('✅ 已发送确认邮件到「' + email + '」\n\n请登录新邮箱查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）')
       } catch (e: any) {
         alert('邮箱更新失败: ' + (e.message || '未知错误'))
         return
