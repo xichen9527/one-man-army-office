@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react'
+import { Toaster } from 'sonner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useStore } from '@/store'
@@ -85,6 +86,7 @@ function RedirectIfAuth({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Router basename={import.meta.env.VITE_BASE_PATH?.replace(/\/$/, '') || undefined}>
+      <Toaster richColors position="top-right" />
       <Routes>
         {/* 公开路由 - 已登录则跳转 */}
         <Route path="/login" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Login /></ErrorBoundary></Suspense></RedirectIfAuth>} />

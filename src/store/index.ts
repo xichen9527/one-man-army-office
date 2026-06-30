@@ -1,5 +1,6 @@
-import { create } from 'zustand'
+﻿import { create } from 'zustand'
 import { supabase } from '@/db/supabase'
+import { toast } from 'sonner'
 import type {
   Profile, ProfileInsert, ProfileUpdate,
   Project, ProjectInsert, ProjectUpdate,
@@ -22,6 +23,18 @@ import type {
   DBFile, DBFileInsert, DBFileUpdate,
   ApprovalRequest, ApprovalRequestInsert, ApprovalRequestUpdate, ApprovalStatus,
 } from '@/types/database'
+
+// ==================== Cached getUser (avoid concurrent auth lock) ====================
+let _userCache: Promise<{ data: { user: any }; error: any }> | null = null
+const getCachedUser = async () => {
+  if (!_userCache) {
+    _userCache = supabase.auth.getUser().then(result => {
+      setTimeout(() => { _userCache = null }, 5000)
+      return result
+    })
+  }
+  return _userCache
+}
 
 // ==================== Store State ====================
 interface AppState {
@@ -216,7 +229,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({ currentUser: null, isAuthenticated: false, loading: false })
       }
     } catch (e) {
-      console.error('[loadUser] failed:', e)
+      toast.error('[loadUser] failed: ' + (e?.message || '[loadUser] failed:'))
       set({ currentUser: null, isAuthenticated: false, loading: false })
     }
   },
@@ -262,99 +275,99 @@ export const useStore = create<AppState>((set, get) => ({
   projects: [],
   fetchProjects: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('projects').select('*').eq('owner_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchProjects failed:', error); return }
+      if (error) { toast.error('fetchProjects failed: ' + (error?.message || 'fetchProjects failed:')); return }
       set({ projects: (data as Project[] | null) || [] })
-    } catch (e) { console.error('fetchProjects failed:', e) }
+    } catch (e) { toast.error('fetchProjects failed: ' + (e?.message || 'fetchProjects failed:')) }
   },
   addProject: async (p) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data } = await supabase.from('projects').insert({ ...p, owner_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ projects: [data as Project, ...s.projects] }))
-    } catch (e) { console.error('addProject failed:', e) }
+    } catch (e) { toast.error('addProject failed: ' + (e?.message || 'addProject failed:')) }
   },
   updateProject: async (id, updates) => {
     try {
       const { data } = await supabase.from('projects').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ projects: s.projects.map((p: Project) => p.id === id ? data as Project : p) }))
-    } catch (e) { console.error('updateProject failed:', e) }
+    } catch (e) { toast.error('updateProject failed: ' + (e?.message || 'updateProject failed:')) }
   },
   deleteProject: async (id) => {
     try {
       await supabase.from('projects').delete().eq('id', id)
       set((s) => ({ projects: s.projects.filter((p: Project) => p.id !== id) }))
-    } catch (e) { console.error('deleteProject failed:', e) }
+    } catch (e) { toast.error('deleteProject failed: ' + (e?.message || 'deleteProject failed:')) }
   },
 
   // ========== Tasks ==========
   tasks: [],
   fetchTasks: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('tasks').select('*').eq('creator_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchTasks failed:', error); return }
+      if (error) { toast.error('fetchTasks failed: ' + (error?.message || 'fetchTasks failed:')); return }
       set({ tasks: (data as Task[] | null) || [] })
-    } catch (e) { console.error('fetchTasks failed:', e) }
+    } catch (e) { toast.error('fetchTasks failed: ' + (e?.message || 'fetchTasks failed:')) }
   },
   addTask: async (t) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data } = await supabase.from('tasks').insert({ ...t, creator_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ tasks: [data as Task, ...s.tasks] }))
-    } catch (e) { console.error('addTask failed:', e) }
+    } catch (e) { toast.error('addTask failed: ' + (e?.message || 'addTask failed:')) }
   },
   updateTask: async (id, updates) => {
     try {
       const { data } = await supabase.from('tasks').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ tasks: s.tasks.map((t: Task) => t.id === id ? data as Task : t) }))
-    } catch (e) { console.error('updateTask failed:', e) }
+    } catch (e) { toast.error('updateTask failed: ' + (e?.message || 'updateTask failed:')) }
   },
   deleteTask: async (id) => {
     try {
       await supabase.from('tasks').delete().eq('id', id)
       set((s) => ({ tasks: s.tasks.filter((t: Task) => t.id !== id) }))
-    } catch (e) { console.error('deleteTask failed:', e) }
+    } catch (e) { toast.error('deleteTask failed: ' + (e?.message || 'deleteTask failed:')) }
   },
 
   // ========== Documents ==========
   documents: [],
   fetchDocuments: async (projectId?, taskId?) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       let query = supabase.from('documents').select('*').order('updated_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
-      if (error) { console.error('fetchDocuments failed:', error); return }
+      if (error) { toast.error('fetchDocuments failed: ' + (error?.message || 'fetchDocuments failed:')); return }
       set({ documents: (data as Document[] | null) || [] })
-    } catch (e) { console.error('fetchDocuments failed:', e) }
+    } catch (e) { toast.error('fetchDocuments failed: ' + (e?.message || 'fetchDocuments failed:')) }
   },
   addDocument: async (d) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data } = await supabase.from('documents').insert({ ...d, creator_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ documents: [data as Document, ...s.documents] }))
-    } catch (e) { console.error('addDocument failed:', e) }
+    } catch (e) { toast.error('addDocument failed: ' + (e?.message || 'addDocument failed:')) }
   },
   updateDocument: async (id, updates) => {
     try {
       const { data } = await supabase.from('documents').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ documents: s.documents.map((d: Document) => d.id === id ? data as Document : d) }))
-    } catch (e) { console.error('updateDocument failed:', e) }
+    } catch (e) { toast.error('updateDocument failed: ' + (e?.message || 'updateDocument failed:')) }
   },
   deleteDocument: async (id) => {
     try {
       await supabase.from('documents').delete().eq('id', id)
       set((s) => ({ documents: s.documents.filter((d: Document) => d.id !== id) }))
-    } catch (e) { console.error('deleteDocument failed:', e) }
+    } catch (e) { toast.error('deleteDocument failed: ' + (e?.message || 'deleteDocument failed:')) }
   },
 
   // ========== Messages & Channels ==========
@@ -363,36 +376,36 @@ export const useStore = create<AppState>((set, get) => ({
   activeChannel: null,
   fetchChannels: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('channels').select('*').or(`created_by.eq.${user.user.id}`).eq('is_private', true).order('created_at')
       const { data: publicData, error: publicError } = await supabase.from('channels').select('*').eq('is_private', false).order('created_at')
       const allData = [...(data || []), ...((publicData || [])).filter(p => !(data || []).some(c => c.id === p.id))]
       const mergedError = error || publicError
-      if (mergedError) { console.error('fetchChannels failed:', mergedError); return }
+      if (mergedError) { toast.error('fetchChannels failed:', mergedError); return }
       set({ channels: (allData as Channel[] | null) || [] })
       const state = get()
       if (allData && allData.length > 0 && !state.activeChannel) {
         set({ activeChannel: allData[0].id })
         get().fetchMessages(allData[0].id)
       }
-    } catch (e) { console.error('fetchChannels failed:', e) }
+    } catch (e) { toast.error('fetchChannels failed: ' + (e?.message || 'fetchChannels failed:')) }
   },
   createChannel: async (name, description, isPrivate) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data } = await supabase.from('channels').insert({
         name, description, is_private: isPrivate, created_by: user.user.id,
       } as ChannelInsert).select().single()
       if (data) set((s) => ({ channels: [...s.channels, data as Channel] }))
-    } catch (e) { console.error('createChannel failed:', e) }
+    } catch (e) { toast.error('createChannel failed: ' + (e?.message || 'createChannel failed:')) }
   },
   updateChannel: async (id, updates) => {
     try {
       const { data } = await supabase.from('channels').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ channels: s.channels.map((c: Channel) => c.id === id ? data as Channel : c) }))
-    } catch (e) { console.error('updateChannel failed:', e) }
+    } catch (e) { toast.error('updateChannel failed: ' + (e?.message || 'updateChannel failed:')) }
   },
   deleteChannel: async (id) => {
     try {
@@ -407,14 +420,14 @@ export const useStore = create<AppState>((set, get) => ({
           activeChannel: s.activeChannel === id ? (remaining[0]?.id || null) : s.activeChannel
         }
       })
-    } catch (e) { console.error('deleteChannel failed:', e) }
+    } catch (e) { toast.error('deleteChannel failed: ' + (e?.message || 'deleteChannel failed:')) }
   },
   fetchMessages: async (channelId) => {
     try {
       const { data, error } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
-      if (error) { console.error('fetchMessages failed:', error); return }
+      if (error) { toast.error('fetchMessages failed: ' + (error?.message || 'fetchMessages failed:')); return }
       set((s) => ({ messages: { ...s.messages, [channelId]: (data as Message[] | null) || [] } }))
-    } catch (e) { console.error('fetchMessages failed:', e) }
+    } catch (e) { toast.error('fetchMessages failed: ' + (e?.message || 'fetchMessages failed:')) }
   },
   setActiveChannel: (id) => {
     set({ activeChannel: id })
@@ -430,26 +443,26 @@ export const useStore = create<AppState>((set, get) => ({
       const { data } = await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content, message_type: 'text', reply_to: replyTo,
       } as any).select().single()
-    } catch (e) { console.error('sendMessage failed:', e); throw e }
+    } catch (e) { toast.error('sendMessage failed: ' + (e?.message || 'sendMessage failed:')); throw e }
   },
   sendFileMessage: async (channelId, fileUrl, fileName, senderId, senderName, replyTo = null) => {
     try {
       await supabase.from('messages').insert({
         channel_id: channelId, sender_id: senderId, sender_name: senderName, content: fileName, message_type: 'file', file_url: fileUrl, file_name: fileName, reply_to: replyTo,
       } as any).select().single()
-    } catch (e) { console.error('sendFileMessage failed:', e); throw e }
+    } catch (e) { toast.error('sendFileMessage failed: ' + (e?.message || 'sendFileMessage failed:')); throw e }
   },
   updateMessage: async (id, channelId, updates) => {
     try {
       const { data } = await supabase.from('messages').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).map((m: Message) => m.id === id ? data as Message : m) } }))
-    } catch (e) { console.error('updateMessage failed:', e); throw e }
+    } catch (e) { toast.error('updateMessage failed: ' + (e?.message || 'updateMessage failed:')); throw e }
   },
   deleteMessage: async (id, channelId) => {
     try {
       await supabase.from('messages').delete().eq('id', id)
       set((s) => ({ messages: { ...s.messages, [channelId]: (s.messages[channelId] || []).filter((m: Message) => m.id !== id) } }))
-    } catch (e) { console.error('deleteMessage failed:', e); throw e }
+    } catch (e) { toast.error('deleteMessage failed: ' + (e?.message || 'deleteMessage failed:')); throw e }
   },
   addNotification: async (userId, title, content, type) => {
     try {
@@ -457,7 +470,7 @@ export const useStore = create<AppState>((set, get) => ({
         user_id: userId, title, content, type, read: false,
       } as any).select().single()
       if (data) set((s) => ({ notifications: [data as Notification, ...s.notifications] }))
-    } catch (e) { console.error('addNotification failed:', e) }
+    } catch (e) { toast.error('addNotification failed: ' + (e?.message || 'addNotification failed:')) }
   },
 
   // ========== Team ==========
@@ -465,7 +478,7 @@ export const useStore = create<AppState>((set, get) => ({
   invitations: [],
   fetchTeamMembers: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data: members } = await supabase.from('team_members').select('user_id, role, status, joined_at').eq('owner_id', user.user.id)
       if (!members) return
@@ -484,20 +497,20 @@ export const useStore = create<AppState>((set, get) => ({
       invited_at: m.invited_at || new Date().toISOString(),
     }))
     set({ members: enriched })
-    } catch (e) { console.error('fetchTeamMembers failed:', e) }
+    } catch (e) { toast.error('fetchTeamMembers failed: ' + (e?.message || 'fetchTeamMembers failed:')) }
   },
   fetchInvitations: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('invitations').select('*').eq('team_owner_id', user.user.id)
-      if (error) { console.error('fetchInvitations failed:', error); return }
+      if (error) { toast.error('fetchInvitations failed: ' + (error?.message || 'fetchInvitations failed:')); return }
       set({ invitations: (data as Invitation[] | null) || [] })
-    } catch (e) { console.error('fetchInvitations failed:', e) }
+    } catch (e) { toast.error('fetchInvitations failed: ' + (e?.message || 'fetchInvitations failed:')) }
   },
   addMember: async (email, role) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const token = crypto.randomUUID()
       const { data } = await supabase.from('invitations').insert({
@@ -518,116 +531,116 @@ export const useStore = create<AppState>((set, get) => ({
           })
         } catch (e) { console.warn('发送邀请邮件失败:', e) }
       }
-    } catch (e) { console.error('addMember failed:', e) }
+    } catch (e) { toast.error('addMember failed: ' + (e?.message || 'addMember failed:')) }
   },
   removeMember: async (id) => {
     try {
       await supabase.from('team_members').delete().eq('id', id)
       set((s) => ({ members: s.members.filter((m: TeamMember) => m.id !== id) }))
-    } catch (e) { console.error('removeMember failed:', e) }
+    } catch (e) { toast.error('removeMember failed: ' + (e?.message || 'removeMember failed:')) }
   },
   updateMember: async (id, updates) => {
     try {
       const { data } = await supabase.from('team_members').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ members: s.members.map((m: TeamMember) => m.id === id ? data as TeamMember : m) }))
-    } catch (e) { console.error('updateMember failed:', e) }
+    } catch (e) { toast.error('updateMember failed: ' + (e?.message || 'updateMember failed:')) }
   },
 
   // ========== CRM ==========
   customers: [],
   fetchCustomers: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('customers').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchCustomers failed:', error); return }
+      if (error) { toast.error('fetchCustomers failed: ' + (error?.message || 'fetchCustomers failed:')); return }
       set({ customers: (data as Customer[] | null) || [] })
-    } catch (e) { console.error('fetchCustomers failed:', e) }
+    } catch (e) { toast.error('fetchCustomers failed: ' + (e?.message || 'fetchCustomers failed:')) }
   },
   addCustomer: async (c) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('customers').insert({ ...c, assigned_to: user.user.id } as any).select().single()
-      if (error) { console.error('addCustomer failed:', error); return }
+      if (error) { toast.error('addCustomer failed: ' + (error?.message || 'addCustomer failed:')); return }
       if (data) set((s) => ({ customers: [data as Customer, ...s.customers] }))
-    } catch (e) { console.error('addCustomer failed:', e) }
+    } catch (e) { toast.error('addCustomer failed: ' + (e?.message || 'addCustomer failed:')) }
   },
   updateCustomer: async (id, updates) => {
     try {
       const { data, error } = await supabase.from('customers').update(updates as any).eq('id', id).select().single()
-      if (error) { console.error('updateCustomer failed:', error); return }
+      if (error) { toast.error('updateCustomer failed: ' + (error?.message || 'updateCustomer failed:')); return }
       if (data) set((s) => ({ customers: s.customers.map((c: Customer) => c.id === id ? data as Customer : c) }))
-    } catch (e) { console.error('updateCustomer failed:', e) }
+    } catch (e) { toast.error('updateCustomer failed: ' + (e?.message || 'updateCustomer failed:')) }
   },
   deleteCustomer: async (id) => {
     try {
       const { error } = await supabase.from('customers').delete().eq('id', id)
-      if (error) { console.error('deleteCustomer failed:', error); return }
+      if (error) { toast.error('deleteCustomer failed: ' + (error?.message || 'deleteCustomer failed:')); return }
       set((s) => ({ customers: s.customers.filter((c: Customer) => c.id !== id) }))
-    } catch (e) { console.error('deleteCustomer failed:', e) }
+    } catch (e) { toast.error('deleteCustomer failed: ' + (e?.message || 'deleteCustomer failed:')) }
   },
   salesOpportunities: [],
   fetchSalesOpportunities: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('sales_opportunities').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchSalesOpportunities failed:', error); return }
+      if (error) { toast.error('fetchSalesOpportunities failed: ' + (error?.message || 'fetchSalesOpportunities failed:')); return }
       set({ salesOpportunities: (data as SalesOpportunity[] | null) || [] })
-    } catch (e) { console.error('fetchSalesOpportunities failed:', e) }
+    } catch (e) { toast.error('fetchSalesOpportunities failed: ' + (e?.message || 'fetchSalesOpportunities failed:')) }
   },
   addOpportunity: async (o) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('sales_opportunities').insert({ ...o, assigned_to: user.user.id } as any).select().single()
-      if (error) { console.error('addOpportunity failed:', error); return }
+      if (error) { toast.error('addOpportunity failed: ' + (error?.message || 'addOpportunity failed:')); return }
       if (data) set((s) => ({ salesOpportunities: [data as SalesOpportunity, ...s.salesOpportunities] }))
-    } catch (e) { console.error('addOpportunity failed:', e) }
+    } catch (e) { toast.error('addOpportunity failed: ' + (e?.message || 'addOpportunity failed:')) }
   },
   updateOpportunity: async (id, updates) => {
     try {
       const { data, error } = await supabase.from('sales_opportunities').update(updates as any).eq('id', id).select().single()
-      if (error) { console.error('updateOpportunity failed:', error); return }
+      if (error) { toast.error('updateOpportunity failed: ' + (error?.message || 'updateOpportunity failed:')); return }
       if (data) set((s) => ({ salesOpportunities: s.salesOpportunities.map((o: SalesOpportunity) => o.id === id ? data as SalesOpportunity : o) }))
-    } catch (e) { console.error('updateOpportunity failed:', e) }
+    } catch (e) { toast.error('updateOpportunity failed: ' + (e?.message || 'updateOpportunity failed:')) }
   },
   deleteOpportunity: async (id) => {
     try {
       const { error } = await supabase.from('sales_opportunities').delete().eq('id', id)
-      if (error) { console.error('deleteOpportunity failed:', error); return }
+      if (error) { toast.error('deleteOpportunity failed: ' + (error?.message || 'deleteOpportunity failed:')); return }
       set((s) => ({ salesOpportunities: s.salesOpportunities.filter((o: SalesOpportunity) => o.id !== id) }))
-    } catch (e) { console.error('deleteOpportunity failed:', e) }
+    } catch (e) { toast.error('deleteOpportunity failed: ' + (e?.message || 'deleteOpportunity failed:')) }
   },
 
   // ========== Followups ==========
   followups: {},
   fetchFollowups: async (customerId: string) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('followups').select('*').eq('customer_id', customerId).eq('user_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchFollowups failed:', error); return }
+      if (error) { toast.error('fetchFollowups failed: ' + (error?.message || 'fetchFollowups failed:')); return }
       set((s) => ({ followups: { ...s.followups, [customerId]: (data as Followup[] | null) || [] } }))
-    } catch (e) { console.error('fetchFollowups failed:', e) }
+    } catch (e) { toast.error('fetchFollowups failed: ' + (e?.message || 'fetchFollowups failed:')) }
   },
   addFollowup: async (data: FollowupInsert) => {
     try {
       const { data: result, error } = await supabase.from('followups').insert(data as any).select().single()
-      if (error) { console.error('addFollowup failed:', error); return }
+      if (error) { toast.error('addFollowup failed: ' + (error?.message || 'addFollowup failed:')); return }
       if (result) {
         const customerId = result.customer_id
         set((s) => ({ followups: { ...s.followups, [customerId]: [result as Followup, ...(s.followups[customerId] || [])] } }))
       }
-    } catch (e) { console.error('addFollowup failed:', e) }
+    } catch (e) { toast.error('addFollowup failed: ' + (e?.message || 'addFollowup failed:')) }
   },
   deleteFollowup: async (id: string, customerId: string) => {
     try {
       const { error } = await supabase.from('followups').delete().eq('id', id)
-      if (error) { console.error('deleteFollowup failed:', error); return }
+      if (error) { toast.error('deleteFollowup failed: ' + (error?.message || 'deleteFollowup failed:')); return }
       set((s) => ({ followups: { ...s.followups, [customerId]: (s.followups[customerId] || []).filter((f: Followup) => f.id !== id) } }))
-    } catch (e) { console.error('deleteFollowup failed:', e) }
+    } catch (e) { toast.error('deleteFollowup failed: ' + (e?.message || 'deleteFollowup failed:')) }
   },
 
   // ========== AI ==========
@@ -636,24 +649,24 @@ export const useStore = create<AppState>((set, get) => ({
   activeAIConv: null,
   fetchAIConversations: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('ai_conversations').select('*').eq('user_id', user.user.id).order('updated_at', { ascending: false })
-      if (error) { console.error('fetchAIConversations failed:', error); return }
+      if (error) { toast.error('fetchAIConversations failed: ' + (error?.message || 'fetchAIConversations failed:')); return }
       set({ aiConversations: (data as AIConversation[] | null) || [] })
-    } catch (e) { console.error('fetchAIConversations failed:', e) }
+    } catch (e) { toast.error('fetchAIConversations failed: ' + (e?.message || 'fetchAIConversations failed:')) }
   },
   fetchAIMessages: async (convId) => {
     try {
       const { data, error } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
-      if (error) { console.error('fetchAIMessages failed:', error); return }
+      if (error) { toast.error('fetchAIMessages failed: ' + (error?.message || 'fetchAIMessages failed:')); return }
       set((s) => ({ aiMessages: { ...s.aiMessages, [convId]: (data as AIMessage[] | null) || [] } }))
-    } catch (e) { console.error('fetchAIMessages failed:', e) }
+    } catch (e) { toast.error('fetchAIMessages failed: ' + (e?.message || 'fetchAIMessages failed:')) }
   },
   setActiveAIConv: (id) => set({ activeAIConv: id }),
   createAIConv: async (title, featureType) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return ''
       const { data } = await supabase.from('ai_conversations').insert({
         user_id: user.user.id, feature_type: featureType, title,
@@ -663,10 +676,10 @@ export const useStore = create<AppState>((set, get) => ({
         return data.id
       }
       return ''
-    } catch (e) { console.error('createAIConv failed:', e); return '' }
+    } catch (e) { toast.error('createAIConv failed: ' + (e?.message || 'createAIConv failed:')); return '' }
   },
   sendAIMessage: async (convId, content) => {
-    const { data: user } = await supabase.auth.getUser()
+    const { data: user } = await getCachedUser()
     if (!user.user) throw new Error('请先登录')
     
     // 插入用户消息
@@ -825,7 +838,7 @@ export const useStore = create<AppState>((set, get) => ({
     const { data: aiMsgFinal, error: aiMsgError } = await supabase.from('ai_messages').update({
       content: aiContent, model: modelName,
     } as any).eq('id', aiMsgPlaceholder.id).select().single()
-    if (aiMsgError) console.error('更新 AI 消息失败:', aiMsgError)
+    if (aiMsgError) toast.error('更新 AI 消息失败:', aiMsgError)
 
     // 更新本地状态为最终内容
     set((s) => ({
@@ -862,25 +875,25 @@ export const useStore = create<AppState>((set, get) => ({
   trendingTopics: [],
   fetchSocialAccounts: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('social_accounts').select('*').eq('user_id', user.user.id).order('created_at')
-      if (error) { console.error('fetchSocialAccounts failed:', error); return }
+      if (error) { toast.error('fetchSocialAccounts failed: ' + (error?.message || 'fetchSocialAccounts failed:')); return }
       set({ socialAccounts: (data as SocialAccount[] | null) || [] })
-    } catch (e) { console.error('fetchSocialAccounts failed:', e) }
+    } catch (e) { toast.error('fetchSocialAccounts failed: ' + (e?.message || 'fetchSocialAccounts failed:')) }
   },
   fetchSocialPosts: async (accountId) => {
     try {
       let query = supabase.from('social_media_posts').select('*').order('created_at', { ascending: false })
       if (accountId) query = query.eq('account_id', accountId)
       const { data, error } = await query
-      if (error) { console.error('fetchSocialPosts failed:', error); return }
+      if (error) { toast.error('fetchSocialPosts failed: ' + (error?.message || 'fetchSocialPosts failed:')); return }
       set({ socialPosts: (data as SocialPost[] | null) || [] })
-    } catch (e) { console.error('fetchSocialPosts failed:', e) }
+    } catch (e) { toast.error('fetchSocialPosts failed: ' + (e?.message || 'fetchSocialPosts failed:')) }
   },
   fetchSocialPostPlatforms: async (postId) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       // 先获取用户的 social account ids
       const { data: accounts } = await supabase.from('social_accounts').select('id').eq('user_id', user.user.id)
@@ -889,23 +902,23 @@ export const useStore = create<AppState>((set, get) => ({
       let query = supabase.from('social_post_platforms').select('*').in('account_id', accountIds)
       if (postId) query = query.eq('post_id', postId)
       const { data, error } = await query
-      if (error) { console.error('fetchSocialPostPlatforms failed:', error); return }
+      if (error) { toast.error('fetchSocialPostPlatforms failed: ' + (error?.message || 'fetchSocialPostPlatforms failed:')); return }
       set({ socialPostPlatforms: (data as SocialPostPlatform[] | null) || [] })
-    } catch (e) { console.error('fetchSocialPostPlatforms failed:', e) }
+    } catch (e) { toast.error('fetchSocialPostPlatforms failed: ' + (e?.message || 'fetchSocialPostPlatforms failed:')) }
   },
   fetchTrendingTopics: async () => {
     try {
       const { data, error } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
-      if (error) { console.error('fetchTrendingTopics failed:', error); return }
+      if (error) { toast.error('fetchTrendingTopics failed: ' + (error?.message || 'fetchTrendingTopics failed:')); return }
       set({ trendingTopics: (data as TrendingTopic[] | null) || [] })
-    } catch (e) { console.error('fetchTrendingTopics failed:', e) }
+    } catch (e) { toast.error('fetchTrendingTopics failed: ' + (e?.message || 'fetchTrendingTopics failed:')) }
   },
   refreshTrendingTopics: async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       if (!token) { 
-        console.error('refreshTrendingTopics: not authenticated')
+        toast.error('refreshTrendingTopics: not authenticated')
         throw new Error('未登录，请先登录')
       }
       const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-trending-lists`
@@ -919,7 +932,7 @@ export const useStore = create<AppState>((set, get) => ({
         body: JSON.stringify({}),
       })
       if (!res.ok) { 
-        console.error('refreshTrendingTopics: Edge Function error', res.status)
+        toast.error('refreshTrendingTopics: Edge Function error', res.status)
         throw new Error(`Edge Function 调用失败: ${res.status}`)
       }
       const result = await res.json()
@@ -932,29 +945,29 @@ export const useStore = create<AppState>((set, get) => ({
       // 返回结果，让前端知道是否使用了 fallback
       return { success: true, usedFallback: result.usedFallback || false }
     } catch (e) { 
-      console.error('refreshTrendingTopics failed:', e)
+      toast.error('refreshTrendingTopics failed: ' + (e?.message || 'refreshTrendingTopics failed:'))
       throw e
     }
   },
   addSocialAccount: async (a) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data } = await supabase.from('social_accounts').insert({ ...a, user_id: user.user.id } as any).select().single()
       if (data) set((s) => ({ socialAccounts: [data as SocialAccount, ...s.socialAccounts] }))
-    } catch (e) { console.error('addSocialAccount failed:', e) }
+    } catch (e) { toast.error('addSocialAccount failed: ' + (e?.message || 'addSocialAccount failed:')) }
   },
   updateSocialAccount: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_accounts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialAccounts: s.socialAccounts.map((a: SocialAccount) => a.id === id ? data as SocialAccount : a) }))
-    } catch (e) { console.error('updateSocialAccount failed:', e) }
+    } catch (e) { toast.error('updateSocialAccount failed: ' + (e?.message || 'updateSocialAccount failed:')) }
   },
   deleteSocialAccount: async (id) => {
     try {
       await supabase.from('social_accounts').delete().eq('id', id)
       set((s) => ({ socialAccounts: s.socialAccounts.filter((a: SocialAccount) => a.id !== id) }))
-    } catch (e) { console.error('deleteSocialAccount failed:', e) }
+    } catch (e) { toast.error('deleteSocialAccount failed: ' + (e?.message || 'deleteSocialAccount failed:')) }
   },
   syncSocialAccount: async (id, credentials) => {
     const account = get().socialAccounts.find((a: SocialAccount) => a.id === id)
@@ -991,38 +1004,38 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data } = await supabase.from('social_media_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
-    } catch (e) { console.error('addSocialPost failed:', e) }
+    } catch (e) { toast.error('addSocialPost failed: ' + (e?.message || 'addSocialPost failed:')) }
   },
   updateSocialPost: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_media_posts').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialPosts: s.socialPosts.map((p: SocialPost) => p.id === id ? data as SocialPost : p) }))
-    } catch (e) { console.error('updateSocialPost failed:', e) }
+    } catch (e) { toast.error('updateSocialPost failed: ' + (e?.message || 'updateSocialPost failed:')) }
   },
   deleteSocialPost: async (id) => {
     try {
       await supabase.from('social_media_posts').delete().eq('id', id)
       set((s) => ({ socialPosts: s.socialPosts.filter((p: SocialPost) => p.id !== id) }))
-    } catch (e) { console.error('deleteSocialPost failed:', e) }
+    } catch (e) { toast.error('deleteSocialPost failed: ' + (e?.message || 'deleteSocialPost failed:')) }
   },
 
   addSocialPostPlatform: async (pp) => {
     try {
       const { data } = await supabase.from('social_post_platforms').insert(pp as any).select().single()
       if (data) set((s) => ({ socialPostPlatforms: [data as SocialPostPlatform, ...s.socialPostPlatforms] }))
-    } catch (e) { console.error('addSocialPostPlatform failed:', e) }
+    } catch (e) { toast.error('addSocialPostPlatform failed: ' + (e?.message || 'addSocialPostPlatform failed:')) }
   },
   updateSocialPostPlatform: async (id, updates) => {
     try {
       const { data } = await supabase.from('social_post_platforms').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ socialPostPlatforms: s.socialPostPlatforms.map((pp: SocialPostPlatform) => pp.id === id ? data as SocialPostPlatform : pp) }))
-    } catch (e) { console.error('updateSocialPostPlatform failed:', e) }
+    } catch (e) { toast.error('updateSocialPostPlatform failed: ' + (e?.message || 'updateSocialPostPlatform failed:')) }
   },
   deleteSocialPostPlatform: async (id) => {
     try {
       await supabase.from('social_post_platforms').delete().eq('id', id)
       set((s) => ({ socialPostPlatforms: s.socialPostPlatforms.filter((pp: SocialPostPlatform) => pp.id !== id) }))
-    } catch (e) { console.error('deleteSocialPostPlatform failed:', e) }
+    } catch (e) { toast.error('deleteSocialPostPlatform failed: ' + (e?.message || 'deleteSocialPostPlatform failed:')) }
   },
 
   // Open OAuth authorization window for a platform account
@@ -1087,133 +1100,133 @@ export const useStore = create<AppState>((set, get) => ({
   conferences: [],
   fetchConferences: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       // RLS policy handles filtering: host or participant can see
       const { data, error } = await supabase.from('video_conferences').select('*').order('created_at', { ascending: false })
-      if (error) { console.error('fetchConferences failed:', error); return }
+      if (error) { toast.error('fetchConferences failed: ' + (error?.message || 'fetchConferences failed:')); return }
       set({ conferences: (data as Conference[] | null) || [] })
-    } catch (e) { console.error('fetchConferences failed:', e) }
+    } catch (e) { toast.error('fetchConferences failed: ' + (e?.message || 'fetchConferences failed:')) }
   },
   addConference: async (c) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const meetingId = 'meet-' + crypto.randomUUID().slice(0, 8)
       const { data } = await supabase.from('video_conferences').insert({
         ...c, host_id: user.user.id, meeting_id: meetingId,
       } as any).select().single()
       if (data) set((s) => ({ conferences: [data as Conference, ...s.conferences] }))
-    } catch (e) { console.error('addConference failed:', e) }
+    } catch (e) { toast.error('addConference failed: ' + (e?.message || 'addConference failed:')) }
   },
   updateConference: async (id, updates) => {
     try {
       const { data } = await supabase.from('video_conferences').update(updates as any).eq('id', id).select().single()
       if (data) set((s) => ({ conferences: s.conferences.map((c: Conference) => c.id === id ? data as Conference : c) }))
-    } catch (e) { console.error('updateConference failed:', e) }
+    } catch (e) { toast.error('updateConference failed: ' + (e?.message || 'updateConference failed:')) }
   },
   deleteConference: async (id) => {
     try {
       await supabase.from('video_conferences').delete().eq('id', id)
       set((s) => ({ conferences: s.conferences.filter((c: Conference) => c.id !== id) }))
-    } catch (e) { console.error('deleteConference failed:', e) }
+    } catch (e) { toast.error('deleteConference failed: ' + (e?.message || 'deleteConference failed:')) }
   },
 
   // ========== Notifications ==========
   notifications: [],
   fetchNotifications: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('notifications').select('*').eq('user_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { console.error('fetchNotifications failed:', error); return }
+      if (error) { toast.error('fetchNotifications failed: ' + (error?.message || 'fetchNotifications failed:')); return }
       set({ notifications: (data as Notification[] | null) || [] })
-    } catch (e) { console.error('fetchNotifications failed:', e) }
+    } catch (e) { toast.error('fetchNotifications failed: ' + (e?.message || 'fetchNotifications failed:')) }
   },
   markNotificationRead: async (id) => {
     try {
       await supabase.from('notifications').update({ read: true } as any).eq('id', id)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => n.id === id ? { ...n, read: true } : n) }))
-    } catch (e) { console.error('markNotificationRead failed:', e) }
+    } catch (e) { toast.error('markNotificationRead failed: ' + (e?.message || 'markNotificationRead failed:')) }
   },
   markAllNotificationsRead: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       await supabase.from('notifications').update({ read: true } as any).eq('user_id', user.user.id).eq('read', false)
       set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, read: true })) }))
-    } catch (e) { console.error('markAllNotificationsRead failed:', e) }
+    } catch (e) { toast.error('markAllNotificationsRead failed: ' + (e?.message || 'markAllNotificationsRead failed:')) }
   },
 
   // ========== Approvals ==========
   approvals: [],
   fetchApprovals: async () => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       // RLS 策略处理权限过滤，前端不做重复判断
       const { data, error } = await supabase
         .from('approvals')
         .select('*')
         .order('created_at', { ascending: false })
-      if (error) { console.error('fetchApprovals failed:', error); return }
+      if (error) { toast.error('fetchApprovals failed: ' + (error?.message || 'fetchApprovals failed:')); return }
       set({ approvals: (data as ApprovalRequest[] | null) || [] })
-    } catch (e) { console.error('fetchApprovals failed:', e) }
+    } catch (e) { toast.error('fetchApprovals failed: ' + (e?.message || 'fetchApprovals failed:')) }
   },
   createApproval: async (data) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data: result, error } = await supabase.from('approvals').insert({ ...data, requester_id: user.user.id } as any).select().single()
-      if (error) { console.error('createApproval failed:', error); return }
+      if (error) { toast.error('createApproval failed: ' + (error?.message || 'createApproval failed:')); return }
       if (result) set((s) => ({ approvals: [result as ApprovalRequest, ...s.approvals] }))
-    } catch (e) { console.error('createApproval failed:', e) }
+    } catch (e) { toast.error('createApproval failed: ' + (e?.message || 'createApproval failed:')) }
   },
   approveRequest: async (id) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const now = new Date().toISOString()
       const { data, error } = await supabase.from('approvals').update({ status: 'approved' as ApprovalStatus, approver_id: user.user.id, resolved_at: now, updated_at: now } as any).eq('id', id).select().single()
-      if (error) { console.error('approveRequest failed:', error); return }
+      if (error) { toast.error('approveRequest failed: ' + (error?.message || 'approveRequest failed:')); return }
       if (data) set((s) => ({ approvals: s.approvals.map((a: ApprovalRequest) => a.id === id ? data as ApprovalRequest : a) }))
-    } catch (e) { console.error('approveRequest failed:', e) }
+    } catch (e) { toast.error('approveRequest failed: ' + (e?.message || 'approveRequest failed:')) }
   },
   rejectRequest: async (id) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       const now = new Date().toISOString()
       const { data, error } = await supabase.from('approvals').update({ status: 'rejected' as ApprovalStatus, approver_id: user.user.id, resolved_at: now, updated_at: now } as any).eq('id', id).select().single()
-      if (error) { console.error('rejectRequest failed:', error); return }
+      if (error) { toast.error('rejectRequest failed: ' + (error?.message || 'rejectRequest failed:')); return }
       if (data) set((s) => ({ approvals: s.approvals.map((a: ApprovalRequest) => a.id === id ? data as ApprovalRequest : a) }))
-    } catch (e) { console.error('rejectRequest failed:', e) }
+    } catch (e) { toast.error('rejectRequest failed: ' + (e?.message || 'rejectRequest failed:')) }
   },
 
   // ========== Files ==========
   files: [],
   fetchFiles: async (projectId?, taskId?) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return
       let query = supabase.from('files').select('*').order('created_at', { ascending: false })
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
-      if (error) { console.error('fetchFiles failed:', error); return }
+      if (error) { toast.error('fetchFiles failed: ' + (error?.message || 'fetchFiles failed:')); return }
       set({ files: (data as DBFile[] | null) || [] })
-    } catch (e) { console.error('fetchFiles failed:', e) }
+    } catch (e) { toast.error('fetchFiles failed: ' + (e?.message || 'fetchFiles failed:')) }
   },
   uploadFile: async (file, projectId, taskId, onProgress) => {
     try {
-      const { data: user } = await supabase.auth.getUser()
+      const { data: user } = await getCachedUser()
       if (!user.user) return null
       const ext = file.name.split('.').pop() || ''
       const filePath = `${user.user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       const { error: uploadError } = await supabase.storage
         .from('files')
         .upload(filePath, file, { cacheControl: '3600', upsert: false })
-      if (uploadError) { console.error('uploadFile storage error:', uploadError); return null }
+      if (uploadError) { toast.error('uploadFile storage error:', uploadError); return null }
       onProgress?.(100)
       const { data, error } = await supabase.from('files').insert({
         name: file.name,
@@ -1226,10 +1239,10 @@ export const useStore = create<AppState>((set, get) => ({
         is_public: true,
         metadata: {},
       } as any).select().single()
-      if (error) { console.error('uploadFile db error:', error); return null }
+      if (error) { toast.error('uploadFile db error:: ' + (error?.message || 'uploadFile db error:')); return null }
       if (data) set((s) => ({ files: [data as DBFile, ...s.files] }))
       return data as DBFile | null
-    } catch (e) { console.error('uploadFile failed:', e); return null }
+    } catch (e) { toast.error('uploadFile failed: ' + (e?.message || 'uploadFile failed:')); return null }
   },
   moveFile: async (fileId, newProjectId, newTaskId) => {
     try {
@@ -1237,9 +1250,9 @@ export const useStore = create<AppState>((set, get) => ({
         .update({ project_id: newProjectId || null, task_id: newTaskId || null } as any)
         .eq('id', fileId)
         .select().single()
-      if (error) { console.error('moveFile failed:', error); return }
+      if (error) { toast.error('moveFile failed: ' + (error?.message || 'moveFile failed:')); return }
       if (data) set((s) => ({ files: s.files.map(f => f.id === fileId ? data as DBFile : f) }))
-    } catch (e) { console.error('moveFile failed:', e) }
+    } catch (e) { toast.error('moveFile failed: ' + (e?.message || 'moveFile failed:')) }
   },
   deleteFile: async (id) => {
     try {
@@ -1247,7 +1260,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (file) await supabase.storage.from('files').remove([file.file_path]).catch(() => {})
       await supabase.from('files').delete().eq('id', id)
       set((s) => ({ files: s.files.filter(f => f.id !== id) }))
-    } catch (e) { console.error('deleteFile failed:', e) }
+    } catch (e) { toast.error('deleteFile failed: ' + (e?.message || 'deleteFile failed:')) }
   },
 
   // ========== Realtime Subscriptions ==========
@@ -1372,3 +1385,6 @@ supabase.auth.onAuthStateChange((event, session) => {
 // 已移除 visibilitychange 监听器：此前注册的监听器会在页面切换回来时触发 loadUser()，
 // 导致 loading 状态变化从而引发页面级重新渲染（表现为页面刷新）。
 // 移除后切换到外部页面再切回时不再有任何刷新行为。
+
+
+
