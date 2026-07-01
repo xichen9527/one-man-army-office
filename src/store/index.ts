@@ -529,7 +529,7 @@ export const useStore = create<AppState>((set, get) => ({
               token,
             }),
           })
-        } catch (e) { console.warn('发送邀请邮件失败:', e) }
+        } catch (e) { toast.error('发送邀请邮件失败: ' + (e?.message || e)) }
       }
     } catch (e) { toast.error('addMember failed: ' + (e?.message || 'addMember failed:')) }
   },
@@ -997,7 +997,7 @@ export const useStore = create<AppState>((set, get) => ({
       }
       return json
     } catch (e) {
-      console.warn('同步失败:', e)
+      toast.error('同步失败: ' + (e?.message || e))
     }
   },
   addSocialPost: async (p) => {

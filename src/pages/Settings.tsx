@@ -274,9 +274,9 @@ export default function Settings() {
         await storeState.loadUser()
       }
 
-      alert('头像上传成功！')
+      toast({ title: '头像上传成功！', variant: 'success' })
     } catch (error: any) {
-      alert('上传失败: ' + error.message)
+      toast({ title: '上传失败', description: error.message, variant: 'destructive' })
     } finally {
       setUploading(false)
     }
@@ -285,7 +285,7 @@ export default function Settings() {
   // 处理浏览器通知开关
   const handleBrowserNotificationChange = async (checked: boolean) => {
     if (!('Notification' in window)) {
-      alert('您的浏览器不支持通知功能')
+      toast({ title: '您的浏览器不支持通知功能', variant: 'destructive' })
       return
     }
 
@@ -302,14 +302,14 @@ export default function Settings() {
           icon: '/favicon.ico'
         })
       } else if (permission === 'denied') {
-        alert('通知权限被拒绝，请在浏览器设置中允许通知')
+        toast({ title: '通知权限被拒绝，请在浏览器设置中允许通知', variant: 'destructive' })
         setBrowserNotification(false)
       } else {
         setBrowserNotification(false)
       }
     } else {
       setBrowserNotification(false)
-      alert('已关闭浏览器通知。如需重新启用，请点击开关并允许通知权限。')
+      toast({ title: '已关闭浏览器通知', description: '如需重新启用，请点击开关并允许通知权限。', variant: 'default' })
     }
   }
 
@@ -351,9 +351,9 @@ export default function Settings() {
       
       setTwoStepEnabled(true)
       setShow2FADialog(false)
-      alert('两步验证已启用！下次登录时需要输入验证码。')
+      toast({ title: '两步验证已启用！下次登录时需要输入验证码。', variant: 'success' })
     } catch (error: any) {
-      alert('启用两步验证失败: ' + error.message)
+      toast({ title: '启用两步验证失败', description: error.message, variant: 'destructive' })
     }
   }
 
@@ -368,9 +368,9 @@ export default function Settings() {
       if (error) throw error
       
       setTwoStepEnabled(false)
-      alert('两步验证已关闭。')
+      toast({ title: '两步验证已关闭。', variant: 'success' })
     } catch (error: any) {
-      alert('关闭两步验证失败: ' + error.message)
+      toast({ title: '关闭两步验证失败', description: error.message, variant: 'destructive' })
     }
   }
 
@@ -386,13 +386,24 @@ export default function Settings() {
       try {
         const { error: emailError } = await sb.auth.updateUser({ email })
         if (emailError) {
-          alert('邮箱更新失败: ' + emailError.message)
+          // 友好错误提示：检测邮箱已注册
+          const isAlreadyRegistered = emailError?.message?.includes('already been registered') ||
+            emailError?.message?.includes('Already used')
+          toast({
+            title: isAlreadyRegistered ? '邮箱更新失败' : '邮箱更新失败',
+            description: isAlreadyRegistered ? '该邮箱已被其他用户注册，请换一个邮箱试试' : emailError.message,
+            variant: 'destructive',
+          })
           return
         }
         // 友好提示：Supabase 会自动发送确认邮件到新邮箱
-        alert('✅ 已发送确认邮件到「' + email + '」\n\n请登录新邮箱查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）')
+        toast({
+          title: '✅ 已发送确认邮件',
+          description: '请登录「' + email + '」查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）',
+          variant: 'success',
+        })
       } catch (e: any) {
-        alert('邮箱更新失败: ' + (e.message || '未知错误'))
+        toast({ title: '邮箱更新失败', description: e.message || '未知错误', variant: 'destructive' })
         return
       }
     }
@@ -415,25 +426,25 @@ export default function Settings() {
     const np = (document.getElementById('newPassword') as HTMLInputElement)?.value
     const cfp = (document.getElementById('confirmPassword') as HTMLInputElement)?.value
     
-    if (!cp || !np || !cfp) { 
-      alert('请填写所有密码字段') 
-      return 
+    if (!cp || !np || !cfp) {
+      toast({ title: '请填写所有密码字段', variant: 'destructive' })
+      return
     }
-    if (np !== cfp) { 
-      alert('两次输入的新密码不一致') 
-      return 
+    if (np !== cfp) {
+      toast({ title: '两次输入的新密码不一致', variant: 'destructive' })
+      return
     }
-    if (np.length < 6) { 
-      alert('密码长度至少6位') 
-      return 
+    if (np.length < 6) {
+      toast({ title: '密码长度至少6位', variant: 'destructive' })
+      return
     }
     
     const { supabase: sb } = await import('@/db/supabase')
     const { error } = await sb.auth.updateUser({ password: np })
-    if (error) { 
-      alert('修改失败: ' + error.message) 
+    if (error) {
+      toast({ title: '修改失败', description: error.message, variant: 'destructive' })
     } else {
-      alert('密码修改成功')
+      toast({ title: '密码修改成功', variant: 'success' })
       ;(document.getElementById('currentPassword') as HTMLInputElement).value = ''
       ;(document.getElementById('newPassword') as HTMLInputElement).value = ''
       ;(document.getElementById('confirmPassword') as HTMLInputElement).value = ''
