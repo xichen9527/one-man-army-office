@@ -137,6 +137,22 @@ export const platformRules: Record<string, PlatformRule> = {
     tips: ['标题必填，推荐30字以内', '封面图必选，推荐16:9（1080x608px）', '图片最多30张，需高清原创', '视频最长60分钟，最大4GB', '原创优先'],
     sensitiveTips: ['禁止虚假标题', '禁止低俗内容', '禁止搬运抄袭'],
   },
+  kuaishou: {
+    key: 'kuaishou', name: '快手',
+    contentTypes: ['video', 'imageText'], defaultContentType: 'video',
+    title: { required: true, maxLength: 30, label: '作品标题（必填，30字以内）' },
+    content: { maxLength: 500, label: '作品描述' },
+    summary: { maxLength: null, required: false, label: '' },
+    images: { maxCount: 9, formats: ['JPG','PNG','WEBP'], maxSingleSizeMB: 20, coverRequired: true, coverAspectRatio: '9:16', coverRecommendSize: '1080x1920px', label: '图片（图文模式最多9张）' },
+    video: { required: true, maxCount: 1, maxLengthMin: 5, maxLengthMinVerified: 10, maxSingleSizeGB: 4, formats: ['MP4','MOV'], aspectRatio: '9:16', label: '视频（必填，推荐竖屏9:16）' },
+    hashtags: { format: 'hashtag', maxCount: 10, recommendCount: '3-5个', label: '#话题' },
+    mentions: { supported: true, format: '@用户名' },
+    category: { required: false, label: '', options: [] },
+    tags: { maxCount: 0, required: false, label: '' },
+    music: { supported: true, label: '推荐使用平台音乐库' },
+    tips: ['视频必填，推荐竖屏9:16', '标题30字以内，描述500字以内', '视频最短5分钟（认证账号10分钟），最大4GB', '支持添加位置信息', '封面图必选'],
+    sensitiveTips: ['禁止低俗内容', '禁止搬运未经授权内容', '禁止虚假信息'],
+  },
 }
 
 export function getStrictestRule(rules: PlatformRule[], field: 'title' | 'content') {

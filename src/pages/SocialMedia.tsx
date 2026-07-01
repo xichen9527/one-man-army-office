@@ -28,6 +28,7 @@ const platformIcons: Record<string, { icon: string; color: string; bg: string }>
   bilibili: { icon: 'B站', color: 'text-blue-500', bg: 'bg-blue-50' },
   zhihu: { icon: '知乎', color: 'text-blue-600', bg: 'bg-blue-50' },
   toutiao: { icon: '头条', color: 'text-red-600', bg: 'bg-red-50' },
+  kuaishou: { icon: '快手', color: 'text-orange-500', bg: 'bg-orange-50' },
 }
 
 const postStatusLabels: Record<SocialPostStatus, { label: string; color: string }> = {
@@ -39,7 +40,7 @@ const postStatusLabels: Record<SocialPostStatus, { label: string; color: string 
 const platformNames: Record<string, string> = {
   weibo: '微博', wechat: '微信公众号', douyin: '抖音',
   xiaohongshu: '小红书', bilibili: 'B站', zhihu: '知乎',
-  toutiao: '头条', other: '其他',
+  toutiao: '头条', kuaishou: '快手', other: '其他',
 }
 
 import { platformRules, getStrictestRule, getImageLimit, getContentTypeConflicts, getContentRecommendations } from '@/config/platform-rules'
@@ -118,6 +119,7 @@ export default function SocialMedia() {
     xiaohongshu: { label1: 'App Key', key1: 'app_key', label2: 'App Secret', key2: 'app_secret' },
     bilibili: { label1: 'App Key', key1: 'app_key', label2: 'App Secret', key2: 'app_secret' },
     zhihu: { label1: 'Client ID', key1: 'client_id', label2: 'Client Secret', key2: 'client_secret' },
+    kuaishou: { label1: 'App Key', key1: 'app_key', label2: 'App Secret', key2: 'app_secret' },
   }
   const [connectPlatform, setConnectPlatform] = useState<string>('weibo')
   const [credForm, setCredForm] = useState<Record<string, string>>({})
@@ -255,7 +257,7 @@ export default function SocialMedia() {
     const mediaUrls = await uploadMediaFiles()
 
     // 创建内容
-    const post = await addSocialPost({
+    const newPostId = await addSocialPost({
       title: pf.title,
       content: pf.content,
       platform: null, // 已废弃
@@ -266,12 +268,14 @@ export default function SocialMedia() {
       media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     })
 
+    if (!newPostId) return // 创建失败时直接退出
+
     // 为每个选中的平台创建关联记录
     for (const platform of selectedPlatforms) {
       const account = socialAccounts.find(a => a.platform === platform)
       if (account) {
         await addSocialPostPlatform({
-          post_id: (socialPosts[0]?.id || ''),
+          post_id: newPostId,
           account_id: account.id,
           platform: platform as any,
           status: status || 'draft',

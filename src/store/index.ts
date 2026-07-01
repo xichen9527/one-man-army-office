@@ -137,7 +137,7 @@ interface AppState {
   updateSocialAccount: (id: string, updates: SocialAccountUpdate) => Promise<void>
   deleteSocialAccount: (id: string) => Promise<void>
   syncSocialAccount: (id: string, credentials: object) => Promise<void>
-  addSocialPost: (p: SocialPostInsert) => Promise<void>
+  addSocialPost: (p: SocialPostInsert) => Promise<string | null>
   updateSocialPost: (id: string, updates: SocialPostUpdate) => Promise<void>
   deleteSocialPost: (id: string) => Promise<void>
   addSocialPostPlatform: (pp: SocialPostPlatformInsert) => Promise<void>
@@ -1004,7 +1004,8 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data } = await supabase.from('social_media_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
-    } catch (e) { toast.error('addSocialPost failed: ' + (e?.message || 'addSocialPost failed:')) }
+      return data?.id || null
+    } catch (e) { toast.error('创建内容失败: ' + (e?.message || '未知错误')); return null }
   },
   updateSocialPost: async (id, updates) => {
     try {

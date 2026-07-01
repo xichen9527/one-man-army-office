@@ -255,7 +255,7 @@ export type SalesOpportunityUpdate = Partial<Omit<SalesOpportunity, 'id' | 'cust
 export interface SocialAccount {
   id: string
   user_id: string
-  platform: 'weibo' | 'wechat' | 'douyin' | 'xiaohongshu' | 'bilibili' | 'zhihu' | 'toutiao' | 'other'
+  platform: 'weibo' | 'wechat' | 'douyin' | 'xiaohongshu' | 'bilibili' | 'zhihu' | 'toutiao' | 'kuaishou' | 'other'
   account_name: string
   account_id: string | null
   follower_count: number
@@ -302,7 +302,7 @@ export interface SocialPostPlatform {
   id: string
   post_id: string
   account_id: string
-  platform: 'weibo' | 'wechat' | 'douyin' | 'xiaohongshu' | 'bilibili' | 'zhihu' | 'toutiao' | 'other'
+  platform: 'weibo' | 'wechat' | 'douyin' | 'xiaohongshu' | 'bilibili' | 'zhihu' | 'toutiao' | 'kuaishou' | 'other'
   status: 'pending' | 'draft' | 'scheduled' | 'published' | 'failed'
   scheduled_at: string | null
   published_at: string | null
