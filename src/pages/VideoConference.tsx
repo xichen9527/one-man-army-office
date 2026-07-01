@@ -187,11 +187,9 @@ export default function VideoConference() {
       // 保存到数据库
       addConference({
         title: `快速会议 ${format(new Date(), 'HH:mm')}`,
-        room_name: roomName,
         scheduled_at: new Date().toISOString(),
         duration: 60,
         status: 'ongoing',
-        host_id: currentUser?.id || '',
         participants: [],
       })
     }
@@ -208,11 +206,9 @@ export default function VideoConference() {
     const roomName = generateRoomName()
     addConference({
       title: newMeeting.title,
-      room_name: roomName,
       scheduled_at: newMeeting.scheduledAt,
       duration: newMeeting.duration,
       status: 'scheduled',
-      host_id: currentUser?.id || '',
       participants: [],
     })
 
