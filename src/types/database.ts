@@ -43,6 +43,8 @@ export interface Profile {
   company: string | null
   bio: string | null
   settings: Json
+  email_change_count: number | null
+  last_email_change_at: string | null
   created_at: string
   updated_at: string
 }

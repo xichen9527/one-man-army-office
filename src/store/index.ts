@@ -1374,12 +1374,22 @@ export const useStore = create<AppState>((set, get) => ({
 }))
 
 // 初始化：监听认证状态变化
-supabase.auth.onAuthStateChange((event, session) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
     useStore.getState().loadUser()
   }
   if (event === 'SIGNED_OUT') {
     useStore.getState().signOut()
+  }
+  // 邮箱变更确认后同步到 profiles 表
+  if (event === 'USER_UPDATED' && session?.user) {
+    const newEmail = session.user.email
+    const userId = session.user.id
+    if (newEmail) {
+      await supabase.from('profiles').update({ email: newEmail }).eq('id', userId)
+      // 重新加载用户数据
+      useStore.getState().loadUser()
+    }
   }
 })
 
