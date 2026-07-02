@@ -774,6 +774,12 @@ export const useStore = create<AppState>((set, get) => ({
       try {
         modelName = activeConfig.model
         const baseUrl = activeConfig.baseUrl.replace(/\/$/, '')
+        
+        // 验证配置
+        if (!activeConfig.apiKey || !activeConfig.baseUrl || !activeConfig.model) {
+          throw new Error('API 配置不完整，请检查 API Key、Base URL 和模型名称是否填写完整')
+        }
+        
         aiContent = await tryStreamCall(
           `${baseUrl}/chat/completions`,
           {
@@ -784,7 +790,22 @@ export const useStore = create<AppState>((set, get) => ({
         )
         streamOk = true
       } catch (e: any) {
-        console.warn('自定义 API 流式调用失败，尝试系统 API:', e.message)
+        const errorMsg = e.message || ''
+        
+        // 提供更详细的错误信息
+        if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+          console.warn('网络连接失败:', errorMsg)
+          throw new Error(`无法连接到 API 服务器（${activeConfig.baseUrl}），请检查：\n1. URL 是否正确\n2. 网络是否正常\n3. API 服务是否可访问`)
+        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Invalid API Key')) {
+          throw new Error(`API Key 无效或已过期，请前往「设置 → AI 模型」重新配置`)
+        } else if (errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('quota')) {
+          throw new Error(`API 调用次数已达上限（${errorMsg}），请：\n1. 检查账户余额\n2. 稍后重试\n3. 更换 API Key`)
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('aborted')) {
+          throw new Error(`请求超时，可能是：\n1. 网络较慢\n2. API 服务响应慢\n3. 消息内容过长\n请稍后重试或缩短输入内容`)
+        } else {
+          console.warn('自定义 API 流式调用失败:', errorMsg)
+          // 不抛出错误，继续尝试降级方案
+        }
       }
     }
 
@@ -792,17 +813,22 @@ export const useStore = create<AppState>((set, get) => ({
     if (!streamOk) {
       try {
         const edgeUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-generation`
-        aiContent = await tryStreamCall(
-          edgeUrl,
-          {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          { messages: contextMessages }
-        )
-        modelName = 'system-default'
-        streamOk = true
+        
+        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+          console.warn('Supabase 环境变量未配置，跳过 Edge Function')
+        } else {
+          aiContent = await tryStreamCall(
+            edgeUrl,
+            {
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            { messages: contextMessages }
+          )
+          modelName = 'system-default'
+          streamOk = true
+        }
       } catch (e: any) {
         console.warn('Edge Function 流式调用失败:', e.message)
       }
@@ -822,13 +848,37 @@ export const useStore = create<AppState>((set, get) => ({
             body: JSON.stringify({ model: activeConfig.model, messages: contextMessages, stream: false }),
             signal: AbortSignal.timeout(60000),
           })
+          
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}))
+            const errMsg = errData.error?.message || errData.message || `HTTP ${resp.status}`
+            throw new Error(`API 调用失败：${errMsg}`)
+          }
+          
           const json = await resp.json()
           aiContent = json.choices?.[0]?.message?.content || ''
+          
+          if (!aiContent) {
+            throw new Error('API 返回内容为空，请检查模型配置是否正确')
+          }
+          
           modelName = activeConfig.model
         }
-      } catch { /* ignore */ }
+      } catch (e: any) {
+        console.warn('非流式调用失败:', e.message)
+        // 只在最后一次尝试时抛出错误，让用户知道发生了什么
+        if (activeConfig) {
+          // 更新占位符消息为错误信息
+          await supabase.from('ai_messages').update({
+            content: `⚠️ AI 调用失败\n\n错误信息：${e.message || '未知错误'}\n\n请检查：\n1. API Key 是否有效\n2. Base URL 是否正确\n3. 模型名称是否存在\n4. 账户余额是否充足\n\n前往「设置 → AI 模型」重新配置`,
+            model: 'error',
+          } as any).eq('id', aiMsgPlaceholder.id)
+          
+          throw new Error(`AI 调用失败：${e.message || '未知错误'}`)
+        }
+      }
 
-      if (!aiContent) {
+      if (!aiContent && !activeConfig) {
         aiContent = `[开发模式] 已收到您的消息：${content}\n\n当前 AI 服务未配置。请在「设置 → AI 模型」中添加您的 API Key 以启用真实 AI 对话。`
         modelName = 'dev-mode'
       }

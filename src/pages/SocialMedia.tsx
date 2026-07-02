@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
+import TrendingMaterials from '@/components/social-media/TrendingMaterials'
 import type { SocialPostStatus } from '@/types/database'
 import type { SocialAccount, SocialPostPlatform } from '@/types/database'
 import { format, parseISO } from 'date-fns'

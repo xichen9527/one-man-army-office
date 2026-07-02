@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { toast } from '@/components/ui/toast'
 import { 
   User, 
   Bell, 
@@ -1030,8 +1031,41 @@ function AIModelSettings() {
   }
 
   const handleAdd = () => {
-    if (!apiKey || !effectiveBaseUrl || !effectiveModel) return
-    const config = { id: editingId || `api-${Date.now()}`, name: effectiveName, baseUrl: effectiveBaseUrl, apiKey, model: effectiveModel, isDefault: editingId ? (apis.find(c => c.id === editingId)?.isDefault || false) : apis.length === 0 }
+    // 1. 验证必填字段
+    if (!apiKey || !effectiveBaseUrl || !effectiveModel) {
+      toast({ title: '请填写完整信息', description: 'API Key、Base URL 和模型名称都是必填项', variant: 'destructive' })
+      return
+    }
+    
+    // 2. 验证 API Key 格式（基本检查）
+    if (apiKey.trim().length < 10) {
+      toast({ title: 'API Key 格式不正确', description: 'API Key 长度不足，请检查是否完整复制', variant: 'destructive' })
+      return
+    }
+    
+    // 3. 验证 URL 格式
+    const urlCheck = isValidApiUrl(effectiveBaseUrl)
+    if (!urlCheck.valid) {
+      toast({ title: 'URL 格式不正确', description: urlCheck.warning || '请检查 Base URL 格式', variant: 'destructive' })
+      return
+    }
+    
+    // 4. 验证模型名称
+    if (!effectiveModel.trim()) {
+      toast({ title: '模型名称不能为空', description: '请输入模型名称（如 gpt-4o、deepseek-chat）', variant: 'destructive' })
+      return
+    }
+    
+    // 5. 创建或更新配置
+    const config = { 
+      id: editingId || `api-${Date.now()}`, 
+      name: effectiveName, 
+      baseUrl: effectiveBaseUrl, 
+      apiKey: apiKey.trim(), 
+      model: effectiveModel.trim(), 
+      isDefault: editingId ? (apis.find(c => c.id === editingId)?.isDefault || false) : apis.length === 0 
+    }
+    
     const newConfigs = [...apis]
     if (editingId) {
       const idx = newConfigs.findIndex(c => c.id === editingId)
@@ -1039,6 +1073,7 @@ function AIModelSettings() {
     } else {
       newConfigs.push(config)
     }
+    
     saveToLs(newConfigs)
     setShowForm(false)
     setEditingId(null)
@@ -1048,6 +1083,8 @@ function AIModelSettings() {
     setSelectedProvider(0)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+    
+    toast({ title: '✅ 保存成功', description: `${effectiveName} 配置已保存`, variant: 'success' })
   }
 
   const handleEdit = (config: AIAPIConfig) => {
@@ -1074,17 +1111,34 @@ function AIModelSettings() {
     saveToLs(updated)
   }
 
-  // URL 有效性检测：确认 baseUrl 看起来像合法的 API endpoint
+  // URL 有效性检测：确认 baseUrl 是有效 URL 且看起来像合法的 API endpoint
   const isValidApiUrl = (url: string): { valid: boolean; warning?: string } => {
-    // 检查明显不是 API endpoint 的 URL（营销页、活动页等）
+    // 1. 基本 URL 格式验证
+    try {
+      const urlObj = new URL(url)
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        return { 
+          valid: false, 
+          warning: 'URL 必须使用 http 或 https 协议' 
+        }
+      }
+    } catch {
+      return { 
+        valid: false, 
+        warning: 'URL 格式不正确，请输入有效的 URL（如 https://api.example.com/v1）' 
+      }
+    }
+
+    // 2. 检查明显不是 API endpoint 的 URL（营销页、活动页等）
     if (/volcengine\.com\/activity/i.test(url)) {
       return { 
         valid: false, 
         warning: '检测到火山引擎/豆包活动页 URL，这不是有效的 API 地址。\n豆包 API 正确地址为：https://ark.cn-beijing.volces.com/api/v3\n\n请参考火山引擎文档获取正确的 API 地址。'
       }
     }
-    // 检查是否包含合法的 API 路径特征
-    const validPatterns = [/\/v1\b/, /\/v1beta\b/, /\/v2\b/, /\/api\//, /\/compatible-mode\//]
+    
+    // 3. 检查是否包含合法的 API 路径特征
+    const validPatterns = [/\/v1\b/, /\/v1beta\b/, /\/v2\b/, /\/api\//, /\/compatible-mode\//, /\/openai\//]
     const hasValidPath = validPatterns.some(p => p.test(url))
     if (!hasValidPath) {
       return {
@@ -1092,6 +1146,7 @@ function AIModelSettings() {
         warning: `URL "${url}" 看起来不像合法的 API endpoint。\n确保地址包含 API 路径（如 /v1），示例格式：\nhttps://api.example.com/v1`
       }
     }
+    
     return { valid: true }
   }
 
@@ -1107,29 +1162,122 @@ function AIModelSettings() {
       return
     }
     
+    // 2. 验证 API Key 格式
+    if (!config.apiKey || config.apiKey.trim().length < 10) {
+      setTestResult({ id: config.id, ok: false, msg: 'API Key 格式不正确，请检查是否完整复制了 API Key' })
+      setTesting(null)
+      return
+    }
+    
     try {
-      const resp = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
-        body: JSON.stringify({ model: config.model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 }),
-        signal: AbortSignal.timeout(10000),
-      })
-      if (resp.ok) {
-        setTestResult({ id: config.id, ok: true, msg: '连接成功 ✅' })
-      } else {
-        const err = await resp.json().catch(() => ({}))
-        const errMsg = err.error?.message || ''
-        // 对常见的余额不足问题给出友好提示
-        if (/balance|余额|quota|credit|insufficient/i.test(errMsg)) {
-          setTestResult({ id: config.id, ok: false, msg: `API 连接正常，但账户余额不足：${errMsg}\n请前往服务商控制台充值后重试。` })
-        } else if (resp.status === 401 || resp.status === 403) {
-          setTestResult({ id: config.id, ok: false, msg: `认证失败（HTTP ${resp.status}）：API Key 无效或权限不足，请检查 Key 是否正确。` })
-        } else {
-          setTestResult({ id: config.id, ok: false, msg: `失败（HTTP ${resp.status}）：${errMsg || resp.statusText || '未知错误'}` })
+      // 3. 尝试多个测试端点
+      const baseUrl = config.baseUrl.replace(/\/$/, '')
+      const endpoints = [
+        { path: '/chat/completions', method: 'POST', body: { model: config.model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 5 } },
+        { path: '/models', method: 'GET', body: null },
+        { path: '/health', method: 'GET', body: null }
+      ]
+      
+      let lastError: any = null
+      let successEndpoint = ''
+      
+      for (const endpoint of endpoints) {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 10000)
+          
+          const fetchOptions: RequestInit = {
+            method: endpoint.method,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+            signal: controller.signal,
+          }
+          
+          if (endpoint.body && endpoint.method === 'POST') {
+            fetchOptions.body = JSON.stringify(endpoint.body)
+          }
+          
+          const resp = await fetch(`${baseUrl}${endpoint.path}`, fetchOptions)
+          clearTimeout(timeoutId)
+          
+          if (resp.ok) {
+            successEndpoint = endpoint.path
+            break
+          } else {
+            const err = await resp.json().catch(() => ({}))
+            const errMsg = err.error?.message || err.message || ''
+            lastError = { status: resp.status, statusText: resp.statusText, error: errMsg }
+            
+            // 如果是 401/403，不需要继续尝试其他端点
+            if (resp.status === 401 || resp.status === 403) {
+              break
+            }
+          }
+        } catch (e: any) {
+          lastError = { error: e.message || '网络错误' }
+          // 网络错误继续尝试下一个端点
+          continue
         }
       }
+      
+      // 4. 处理结果
+      if (successEndpoint) {
+        setTestResult({ 
+          id: config.id, 
+          ok: true, 
+          msg: `连接成功 ✅ (通过 ${successEndpoint})` 
+        })
+      } else if (lastError) {
+        // 友好错误提示
+        if (lastError.status === 401 || lastError.status === 403) {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `认证失败（HTTP ${lastError.status}）：API Key 无效或权限不足，请检查 Key 是否正确。` 
+          })
+        } else if (lastError.status === 404) {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `端点不存在（HTTP 404）：${baseUrl} 可能不是正确的 API 地址，请检查 URL 是否包含 /v1 等路径。` 
+          })
+        } else if (lastError.status === 429) {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `请求过于频繁（HTTP 429）：API 调用次数已达上限，请稍后重试或检查配额。` 
+          })
+        } else if (lastError.error && /balance|余额|quota|credit|insufficient/i.test(lastError.error)) {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `账户余额不足：${lastError.error}\n请前往服务商控制台充值后重试。` 
+          })
+        } else if (lastError.error && /model.*not.*found|invalid.*model/i.test(lastError.error)) {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `模型不存在：${lastError.error}\n请检查模型名称是否正确（当前：${config.model}）` 
+          })
+        } else {
+          setTestResult({ 
+            id: config.id, 
+            ok: false, 
+            msg: `连接失败（HTTP ${lastError.status || 'N/A'}）：${lastError.error || lastError.statusText || '未知错误'}` 
+          })
+        }
+      } else {
+        setTestResult({ 
+          id: config.id, 
+          ok: false, 
+          msg: '连接失败：所有测试端点均无响应，请检查网络连接和 URL 是否正确。' 
+        })
+      }
     } catch (e: any) {
-      setTestResult({ id: config.id, ok: false, msg: `连接失败: ${e.message || '网络错误'}` })
+      setTestResult({ 
+        id: config.id, 
+        ok: false, 
+        msg: `连接失败: ${e.message || '未知错误'}` 
+      })
     } finally {
       setTesting(null)
     }
