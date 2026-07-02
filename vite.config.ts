@@ -31,6 +31,18 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: true,
       chunkSizeWarningLimit: 250,
+      // 保留变量名，减少 TDZ 错误的概率
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          passes: 2,
+        },
+        mangle: {
+          // 保留变量名，避免 TDZ 错误
+          keep_fnames: true,
+          reserved: ['z'], // 保留可能的冲突变量名
+        },
+      },
       rolldownOptions: {
         output: {
           manualChunks(id) {
