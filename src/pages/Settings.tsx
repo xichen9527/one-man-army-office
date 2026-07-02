@@ -49,6 +49,11 @@ export default function Settings() {
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>('weak')
   const [strengthText, setStrengthText] = useState('')
   
+  // 邮箱修改次数限制
+  const [emailChangeCount, setEmailChangeCount] = useState(0)
+  const [emailChangeLimitReached, setEmailChangeLimitReached] = useState(false)
+  const MAX_EMAIL_CHANGES = 2
+  
   // 浏览器通知状态
   const [browserNotification, setBrowserNotification] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
@@ -78,13 +83,31 @@ export default function Settings() {
   // 主题色状态
   const [accentColor, setAccentColor] = useState('#3B82F6')
 
-  // 初始化时检查通知权限
+  // 初始化时检查通知权限和邮箱修改次数
   useEffect(() => {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission)
       setBrowserNotification(Notification.permission === 'granted')
     }
-  }, [])
+    // 加载邮箱修改次数
+    loadEmailChangeCount()
+  }, [currentUser?.id])
+  
+  // 加载邮箱修改次数
+  const loadEmailChangeCount = async () => {
+    if (!currentUser?.id) return
+    const { supabase: sb } = await import('@/db/supabase')
+    const { data, error } = await sb
+      .from('profiles')
+      .select('email_change_count')
+      .eq('id', currentUser.id)
+      .single()
+    if (data && !error) {
+      const count = data.email_change_count || 0
+      setEmailChangeCount(count)
+      setEmailChangeLimitReached(count >= MAX_EMAIL_CHANGES)
+    }
+  }
 
   // 应用主题
   useEffect(() => {
@@ -381,8 +404,18 @@ export default function Settings() {
     if (fullName !== currentUser?.full_name) updates.full_name = fullName
     if (username !== currentUser?.username) updates.username = username
     
-    // 更新邮箱（通过 auth API）
+    // 更新邮箱（通过 auth API）- 带次数限制
     if (email !== currentUser?.email) {
+      // 检查是否超过修改次数限制
+      if (emailChangeCount >= MAX_EMAIL_CHANGES) {
+        toast({
+          title: '邮箱修改次数已达上限',
+          description: `每个账号最多可修改 ${MAX_EMAIL_CHANGES} 次邮箱，您已用完所有机会。如需修改，请联系管理员。`,
+          variant: 'destructive',
+        })
+        return
+      }
+      
       try {
         const { error: emailError } = await sb.auth.updateUser({ email })
         if (emailError) {
@@ -396,10 +429,20 @@ export default function Settings() {
           })
           return
         }
+        
+        // 邮箱更新成功，增加修改次数
+        const newCount = emailChangeCount + 1
+        await sb.from('profiles').update({
+          email_change_count: newCount,
+          last_email_change_at: new Date().toISOString()
+        }).eq('id', currentUser.id)
+        setEmailChangeCount(newCount)
+        setEmailChangeLimitReached(newCount >= MAX_EMAIL_CHANGES)
+        
         // 友好提示：Supabase 会自动发送确认邮件到新邮箱
         toast({
           title: '✅ 已发送确认邮件',
-          description: '请登录「' + email + '」查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）',
+          description: `请登录「${email}」查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）\n\n剩余修改次数：${MAX_EMAIL_CHANGES - newCount}/${MAX_EMAIL_CHANGES}`,
           variant: 'success',
         })
       } catch (e: any) {
@@ -590,13 +633,25 @@ export default function Settings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email">邮箱</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="email">邮箱</Label>
+                    <span className={`text-xs ${emailChangeLimitReached ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+                      剩余修改次数：{MAX_EMAIL_CHANGES - emailChangeCount}/{MAX_EMAIL_CHANGES}
+                    </span>
+                  </div>
                   <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={emailChangeLimitReached}
+                    className={emailChangeLimitReached ? 'bg-muted cursor-not-allowed' : ''}
                   />
+                  {emailChangeLimitReached && (
+                    <p className="text-xs text-red-500">
+                      您已用完所有邮箱修改次数，如需修改请联系管理员
+                    </p>
+                  )}
                 </div>
               </div>
 
