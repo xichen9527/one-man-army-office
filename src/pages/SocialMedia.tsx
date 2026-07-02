@@ -12,7 +12,8 @@ import {
   Plus, Trash2, Edit3, RefreshCw, ExternalLink, Search,
   TrendingUp, TrendingDown, Minus, BarChart3, Users, Eye,
   Heart, MessageCircle, Share2, Calendar, CheckCircle, XCircle,
-  Clock, MoreVertical, ArrowUpRight, Globe, Upload, Image, Video, X, Loader2
+  Clock, MoreVertical, ArrowUpRight, Globe, Upload, Image, Video, X, Loader2,
+  Maximize2, Sparkles, Download
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
