@@ -247,9 +247,9 @@ export default function Collaboration() {
         setInviteResult(null)
       }, 2000)
     } catch (error: any) {
-      console.error('Invite failed:', error)
       const errorMsg = error?.message || '邀请失败，请重试'
       setInviteResult({ ok: false, msg: errorMsg })
+      toast({ title: '邀请失败', description: errorMsg, variant: 'destructive' })
     } finally {
       setInviteSending(false)
     }
@@ -572,7 +572,6 @@ export default function Collaboration() {
                                         })
                                       })
                                       .catch((err) => {
-                                        console.error('退出频道失败:', err)
                                         addNotification({
                                           type: 'error',
                                           title: '退出失败',
