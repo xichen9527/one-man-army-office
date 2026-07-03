@@ -46,6 +46,10 @@ export default function Collaboration() {
   const msgInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Document/File viewer state
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null)
+  const [viewingFile, setViewingFile] = useState<DBFile | null>(null)
+
   // @mention state
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOpen, setMentionOpen] = useState(false)
@@ -1118,6 +1122,197 @@ export default function Collaboration() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
             <Button variant="destructive" onClick={() => deleteConfirmId && handleDeleteMsg(deleteConfirmId)}>删除</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Viewer Modal */}
+      <Dialog open={!!viewingDoc} onOpenChange={(v) => { if (!v) setViewingDoc(null) }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-green-500" />
+                <DialogTitle>{viewingDoc?.title || '文档预览'}</DialogTitle>
+                <Badge variant="secondary" className="text-[10px]">{viewingDoc?.file_type}</Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { if (viewingDoc) navigate(`/project-management?doc=${viewingDoc.id}`) }}
+                >
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" />在新页面打开
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setViewingDoc(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="flex-1">
+            {viewingDoc?.content ? (
+              <div className="p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                {viewingDoc.content}
+              </div>
+            ) : viewingDoc?.file_url ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <FileText className="w-16 h-16 text-gray-300 mb-4" />
+                <p className="text-sm text-gray-500 mb-4">
+                  文件类型：{viewingDoc?.file_type}，点击下方按钮下载查看
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => { if (viewingDoc?.file_url) window.open(viewingDoc.file_url, '_blank') }}
+                >
+                  <Download className="w-4 h-4 mr-1" />下载文档
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <FileText className="w-16 h-16 text-gray-300 mb-4" />
+                <p className="text-sm text-gray-500">暂无内容预览，请在新页面打开</p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => { if (viewingDoc) navigate(`/project-management?doc=${viewingDoc.id}`) }}
+                >
+                  <ExternalLink className="w-4 h-4 mr-1" />在新页面打开
+                </Button>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Viewer Modal */}
+      <Dialog open={!!viewingFile} onOpenChange={(v) => { if (!v) setViewingFile(null) }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {getFileIcon(viewingFile?.file_name || '')}
+                <DialogTitle>{viewingFile?.file_name || '文件预览'}</DialogTitle>
+                <Badge variant="secondary" className="text-[10px]">{viewingFile?.file_type}</Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { if (viewingFile) handleFileClick(viewingFile) }}>
+                  <Download className="w-3.5 h-3.5 mr-1" />下载
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setViewingFile(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="flex-1">
+            <div className="flex flex-col items-center justify-center py-12">
+              {(() => {
+                if (!viewingFile) return null
+                const ext = viewingFile.file_name?.split('.').pop()?.toLowerCase()
+                let url = viewingFile.file_url
+                if (!url && viewingFile.file_path) {
+                  try {
+                    const { data } = supabase.storage.from('files').getPublicUrl(viewingFile.file_path)
+                    url = data?.publicUrl
+                  } catch { /* ignore */ }
+                }
+                if (!url) {
+                  return (
+                    <div className="text-center">
+                      <File className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-sm text-gray-500 mb-4">无法获取文件预览</p>
+                    </div>
+                  )
+                }
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '')) {
+                  return <img src={url} alt={viewingFile.file_name} className="max-w-full max-h-[70vh] object-contain" />
+                }
+                if (ext === 'pdf') {
+                  return <iframe src={url} className="w-full h-[70vh]" title={viewingFile.file_name} />
+                }
+                return (
+                  <div className="text-center">
+                    <File className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-sm text-gray-500 mb-2">文件类型：{viewingFile.file_type}</p>
+                    <p className="text-xs text-gray-400 mb-4">大小：{(viewingFile.file_size / 1024 / 1024).toFixed(2)}MB</p>
+                    <Button variant="outline" onClick={() => handleFileClick(viewingFile)}>
+                      <Download className="w-4 h-4 mr-1" />下载文件
+                    </Button>
+                  </div>
+                )
+              })()}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Module Merge Dialog */}
+      <Dialog open={mergeDialogOpen} onOpenChange={(v) => { if (!v) { setMergeDialogOpen(false); setMergeName(''); setSelectedForMerge([]); setMergeMode(false) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <GitMerge className="w-5 h-5 text-purple-500" />
+              <DialogTitle>合并模块</DialogTitle>
+            </div>
+            <DialogDescription>
+              将选中的 {selectedForMerge.length} 个模块合并为一个新项目，合并后原模块保留，仅创建一个新项目汇总。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+              <p className="text-xs font-medium text-gray-500 mb-2">选中的模块：</p>
+              {selectedForMerge.map(item => (
+                <div key={item.id} className="flex items-center gap-2 text-sm">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.type === 'project' ? 'bg-blue-500' : 'bg-purple-400'}`} />
+                  <span className="truncate">{item.name}</span>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                    {item.type === 'project' ? '项目' : '其他'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">新项目名称 *</label>
+              <Input
+                placeholder="例如：Q3季度总结合并"
+                value={mergeName}
+                onChange={e => setMergeName(e.target.value)}
+              />
+              {mergeName.trim().length > 0 && mergeName.trim().length < 2 && (
+                <p className="text-xs text-red-500 mt-1">项目名称至少2个字符</p>
+              )}
+            </div>
+            <div className="bg-amber-50 rounded-lg p-2 text-xs text-amber-700">
+              ⚠️ 合并仅创建汇总项目，原有模块不会被删除或修改。
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setMergeDialogOpen(false); setMergeName('') }}>取消</Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700"
+              disabled={mergeName.trim().length < 2 || selectedForMerge.length < 2}
+              onClick={async () => {
+                if (mergeName.trim().length < 2 || selectedForMerge.length < 2) return
+                try {
+                  const { addProject } = useStore.getState()
+                  await addProject({
+                    name: mergeName.trim(),
+                    description: `由 ${selectedForMerge.length} 个模块合并而成：` + selectedForMerge.map(s => s.name).join('、'),
+                    status: 'active',
+                  })
+                  toast({ title: '模块合并成功', description: `已创建「${mergeName.trim()}」项目`, variant: 'success' })
+                  setMergeDialogOpen(false)
+                  setMergeName('')
+                  setSelectedForMerge([])
+                  setMergeMode(false)
+                } catch (err: any) {
+                  toast({ title: '合并失败', description: err?.message || '未知错误', variant: 'destructive' })
+                }
+              }}
+            >
+              <Merge className="w-4 h-4 mr-1" />确认合并
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

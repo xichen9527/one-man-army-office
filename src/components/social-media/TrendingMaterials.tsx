@@ -144,7 +144,7 @@ export default function TrendingMaterials({ onWriteFromTrending }: TrendingMater
         try {
           data = await fetchWeibo()
         } catch {
-          console.log('使用微博静态数据')
+          // 使用微博静态数据
           data = WEIBO_FALLBACK
           setUsingFallback(true)
         }
@@ -152,7 +152,7 @@ export default function TrendingMaterials({ onWriteFromTrending }: TrendingMater
         try {
           data = await fetchZhihu()
         } catch {
-          console.log('使用知乎静态数据')
+          // 使用知乎静态数据
           data = ZHIHU_FALLBACK
           setUsingFallback(true)
         }

@@ -93,6 +93,56 @@ export default function SocialMedia() {
   // Post form
   const [pf, setPf] = useState({ title: '', content: '', account_id: '', summary: '', category: '', tags: '' })
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]) // 多选平台
+  
+  // Template selection
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  
+  // Template definitions
+  const templates = [
+    {
+      id: 'weibo',
+      name: '微博模板',
+      platform: 'weibo',
+      content: '#[话题]# [您的微博内容，最多140字]\n\n#[热点]# #[每日分享]#'  
+    },
+    {
+      id: 'wechat',
+      name: '微信模板',
+      platform: 'wechat',
+      content: '【标题】[文章标题]\n\n【摘要】[文章摘要，吸引读者点击]\n\n【正文】\n[您的文章内容]\n\n【标签】#[标签1]# #[标签2]#'  
+    },
+    {
+      id: 'douyin',
+      name: '抖音模板',
+      platform: 'douyin',
+      content: '【视频标题】[吸引人的标题，包含关键词]\n\n【话题标签】\n#[热门话题]# #[您的行业]# #[相关内容]#'  
+    },
+    {
+      id: 'xiaohongshu',
+      name: '小红书模板',
+      platform: 'xiaohongshu',
+      content: '📝 [标题：分享我的...经验/心得]\n\n✨ [开头：吸引眼球的描述]\n\n[正文内容，分段描述]\n\n💡 [实用tips或建议]\n\n#[标签1]# #[标签2]# #[标签3]#'  
+    },
+    {
+      id: 'bilibili',
+      name: 'B站模板',
+      platform: 'bilibili',
+      content: '【视频标题】[标题要吸引人]\n\n【视频简介】\n[视频内容简介]\n\n【章节目录】\n00:00 开头\n01:30 第一部分\n03:00 第二部分\n05:00 结尾\n\n【标签】#[标签1]# #[标签2]#'  
+    },
+    {
+      id: 'zhihu',
+      name: '知乎模板',
+      platform: 'zhihu',
+      content: '**问题：** [您的问题]\n\n**回答：**\n[您的回答内容]\n\n---\n**参考资料：**\n- [参考资料1]\n- [参考资料2]'  
+    },
+    {
+      id: 'kuaishou',
+      name: '快手模板',
+      platform: 'kuaishou',
+      content: '【作品标题】[简短有力的标题]\n\n【作品描述】\n[描述内容，贴近生活]\n\n【话题】\n#[热门话题]# #[生活记录]#'  
+    }
+  ]
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduledTime, setScheduledTime] = useState('')
   // Media upload
@@ -904,6 +954,35 @@ export default function SocialMedia() {
               {selectedPlatforms.length === 0 && (
                 <p className="text-xs text-amber-500">请至少选择一个目标平台，选择后编辑区将显示对应平台要求</p>
               )}
+
+            {/* 模板选择 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">内容模板</span>
+                <span className="text-xs text-gray-400">可选</span>
+              </div>
+              <select
+                value={selectedTemplate || ''}
+                onChange={(e) => {
+                  const template = templates.find(t => t.id === e.target.value)
+                  if (template) {
+                    setPf({ ...pf, content: template.content })
+                    setSelectedTemplate(template.id)
+                  } else {
+                    setSelectedTemplate(null)
+                  }
+                }}
+                className="w-full border rounded-md p-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 bg-white"
+              >
+                <option value="">无模板（空白内容）</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              {selectedTemplate && (
+                <p className="text-[10px] text-blue-600">✓ 已应用{selectedTemplate === 'weibo' ? '微博' : '知乎'}模板，可在下方编辑区修改</p>
+              )}
+            </div>
             </div>
 
             {/* ===== 根据平台动态渲染编辑字段 ===== */}
