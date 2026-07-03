@@ -1183,7 +1183,7 @@ function ProjectModal({ onClose, onSave, project }: {
   const [client, setClient] = useState((meta.client as string) || '')
   const [dueDate, setDueDate] = useState((meta.due_date as string) || '')
   const [priority, setPriority] = useState((meta.priority as string) || 'medium')
-  const [status, setStatus] = useState<'active' | 'completed' | 'archived'>((project?.status as any) || 'active'))
+  const [status, setStatus] = useState<'active' | 'completed' | 'archived'>((project?.status as any) || 'active')
 
   function handleSave() {
     const metadata: Record<string, unknown> = { ...meta }

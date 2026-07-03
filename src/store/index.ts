@@ -22,6 +22,7 @@ import type {
   Invitation, InvitationInsert, InvitationUpdate,
   DBFile, DBFileInsert, DBFileUpdate,
   ApprovalRequest, ApprovalRequestInsert, ApprovalRequestUpdate, ApprovalStatus,
+  Followup, FollowupInsert, FollowupUpdate,
 } from '@/types/database'
 
 // ==================== Cached getUser (avoid concurrent auth lock) ====================
