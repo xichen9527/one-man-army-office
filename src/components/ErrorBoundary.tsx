@@ -1,41 +1,78 @@
-﻿import React from 'react'
-import { AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
-interface Props { children: React.ReactNode }
-interface State { hasError: boolean; error: Error | null }
+interface Props {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
 
-export default class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false, error: null }
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
 
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
+class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, info.componentStack)
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
-  render() {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  render(): ReactNode {
     if (this.state.hasError) {
-      return (
-        <div className="flex items-center justify-center min-h-[400px] p-8">
-          <div className="max-w-md text-center space-y-4">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-            <h2 className="text-lg font-semibold text-gray-900">页面渲染异常</h2>
-            <pre className="text-sm text-red-600 bg-red-50 rounded-lg p-4 text-left overflow-auto max-h-48">
-              {this.state.error?.message}
-            </pre>
-            <Button variant="outline" onClick={() => this.setState({ hasError: false, error: null })}>
-              重试
-            </Button>
-            <Button variant="ghost" onClick={() => window.location.href = '/dashboard'}>
-              返回工作台
-            </Button>
-          </div>
+      return this.props.fallback || (
+        <div style={{ 
+          padding: '20px', 
+          textAlign: 'center', 
+          color: '#ef4444',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <h2>⚠️ 页面出错</h2>
+          <p>错误信息: {this.state.error?.message || '未知错误'}</p>
+          <button 
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            重试
+          </button>
+          <button 
+            onClick={() => window.location.href = '/one-man-army-office/'}
+            style={{
+              marginTop: '10px',
+              padding: '10px 20px',
+              backgroundColor: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            返回首页
+          </button>
         </div>
-      )
+      );
     }
-    return this.props.children
+
+    return this.props.children;
   }
 }
+
+export default ErrorBoundary;
