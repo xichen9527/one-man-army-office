@@ -466,7 +466,6 @@ export default function SocialMedia() {
           .upload(path, file, { cacheControl: '3600', upsert: false })
 
         if (uploadError) {
-          console.error('Failed to upload media:', uploadError)
           toast({ title: '上传失败', description: file.name, variant: 'destructive' })
           continue
         }

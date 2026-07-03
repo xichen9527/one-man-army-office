@@ -75,7 +75,6 @@ function MeetingRoom({ onLeave }: { onLeave: () => void }) {
             leave: true,
           }}
           onDeviceFailure={(error) => {
-            console.error('Device failure:', error)
             toast({ title: '设备错误', description: error.message, variant: 'destructive' })
           }}
         />
@@ -188,7 +187,6 @@ export default function VideoConference() {
       }
       return data
     } catch (error: any) {
-      console.error('Failed to get LiveKit token:', error)
       // 特殊处理 401 错误
       const errMsg = error?.message || ''
       if (errMsg.includes('401') || errMsg.toLowerCase().includes('unauthorized')) {

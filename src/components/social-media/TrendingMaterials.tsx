@@ -90,7 +90,6 @@ export default function TrendingMaterials({ onWriteFromTrending }: TrendingMater
 
       throw new Error('数据格式错误')
     } catch (err) {
-      console.error('Failed to fetch Weibo:', err)
       throw err
     }
   }
@@ -126,7 +125,6 @@ export default function TrendingMaterials({ onWriteFromTrending }: TrendingMater
 
       throw new Error('数据格式错误')
     } catch (err) {
-      console.error('Failed to fetch Zhihu:', err)
       throw err
     }
   }

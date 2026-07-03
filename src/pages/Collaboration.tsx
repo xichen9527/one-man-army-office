@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,12 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus, Search,
+  MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus,
   Trash2, Mail, Crown, Shield, UserCheck, ListTodo, FolderOpen, Edit3, X,
-  MoreVertical, Reply, Paperclip, Download, File, FileText, Image, FileIcon,
+  MoreVertical, Reply, Paperclip, Download, File, FileText, Image,
   ClipboardCheck, CheckCircle2, XCircle, Clock
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import { toast } from '@/components/ui/toast'
@@ -26,9 +26,9 @@ export default function Collaboration() {
   const {
     currentUser, channels, messages, activeChannel, setActiveChannel, sendMessage, sendFileMessage,
     createChannel, updateChannel, deleteChannel, members, addMember, removeMember, tasks, projects,
-    documents, files, fetchDocuments, fetchFiles,
+    documents, files,
     updateMessage, deleteMessage, addNotification,
-    approvals, fetchApprovals, approveRequest, rejectRequest,
+    approvals, approveRequest, rejectRequest,
   } = useStore()
 
   const [msgInput, setMsgInput] = useState('')
@@ -53,7 +53,7 @@ export default function Collaboration() {
   // @mention state
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOpen, setMentionOpen] = useState(false)
-  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 })
+  const [, setMentionPosition] = useState({ top: 0, left: 0 })
   const mentionRef = useRef<HTMLDivElement>(null)
 
   // Approval filter state
@@ -71,7 +71,7 @@ export default function Collaboration() {
   // Channel name validation state
   const [channelNameError, setChannelNameError] = useState('')
 
-  const navigate = useNavigate()
+
 
   const handleFileClick = (file) => {
     const { data, error } = supabase.storage.from('files').getPublicUrl(file.file_path)
@@ -102,9 +102,7 @@ export default function Collaboration() {
 
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + 0.2)
-    } catch (e) {
-      console.warn('Failed to play beep:', e)
-    }
+    } catch { /* beep not critical */ }
   }, [])
 
   // Channel menu state
@@ -285,7 +283,7 @@ export default function Collaboration() {
 
       await sendFileMessage(activeChannel, fileUrl, file.name, userId, userName, replyToMsg?.id || null)
       setReplyToMsg(null)
-    } catch (err) {
+    } catch {
       toast({ title: '文件上传失败', variant: 'destructive' })
     } finally {
       setUploading(false)
@@ -306,7 +304,7 @@ export default function Collaboration() {
   }
 
   // ========== Render message with @mention highlights ==========
-  const renderContent = (content: string, senderId: string) => {
+  const renderContent = (content: string) => {
     const parts = content.split(/(@[^\s@]+)/g)
     return parts.map((part, i) => {
       if (part.startsWith('@')) {
@@ -575,7 +573,7 @@ export default function Collaboration() {
                                           created_at: new Date().toISOString(),
                                         })
                                       })
-                                      .catch((err) => {
+                                      .catch(() => {
                                         addNotification({
                                           type: 'error',
                                           title: '退出失败',
@@ -709,7 +707,7 @@ export default function Collaboration() {
                               <Download className="w-4 h-4 text-gray-400 ml-2" />
                             </a>
                           ) : (
-                            <p className="text-sm text-gray-700 mt-0.5">{renderContent(msg.content, msg.sender_id)}</p>
+                            <p className="text-sm text-gray-700 mt-0.5">{renderContent(msg.content)}</p>
                           )}
                         </div>
                       </div>
