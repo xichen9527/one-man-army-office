@@ -969,14 +969,14 @@ export default function Collaboration() {
                   <CardContent>
                     <div className="space-y-2">
                       {projDocs.map(doc => (
-                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/project-management?doc=${doc.id}`)}>
+                        <div key={doc.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); setViewingDoc(doc) }}>
                           <FileText className="w-4 h-4 text-green-500" />
                           <span className="text-sm flex-1 truncate">{doc.title}</span>
                           <span className="text-[10px] text-gray-400">{doc.file_type}</span>
                         </div>
                       ))}
                       {projFiles.map(file => (
-                        <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => handleFileClick(file)}>
+                        <div key={file.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); setViewingFile(file) }}>
                           <File className="w-4 h-4 text-blue-500" />
                           <span className="text-sm flex-1 truncate">{file.file_name}</span>
                           <span className="text-[10px] text-gray-400">{file.file_type} {(file.file_size / 1024 / 1024).toFixed(2)}MB</span>
