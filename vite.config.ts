@@ -29,20 +29,11 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      sourcemap: true,
-      chunkSizeWarningLimit: 250,
-      // 保留变量名，减少 TDZ 错误的概率
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          passes: 2,
-        },
-        mangle: {
-          // 保留变量名，避免 TDZ 错误
-          keep_fnames: true,
-          reserved: ['z'], // 保留可能的冲突变量名
-        },
-      },
+      sourcemap: false,
+      chunkSizeWarningLimit: 300,
+      // 使用 esbuild 代替 terser，消除 TDZ (Temporal Dead Zone) 错误
+      // esbuild 不做变量重命名，更稳定
+      minify: 'esbuild',
       rolldownOptions: {
         output: {
           manualChunks(id) {

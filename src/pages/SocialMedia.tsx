@@ -48,6 +48,14 @@ const platformNames: Record<string, string> = {
 import { platformRules, getStrictestRule, getImageLimit, getContentTypeConflicts, getContentRecommendations } from '@/config/platform-rules'
 import type { ContentType } from '@/config/platform-rules'
 
+// 文件大小格式化
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function highlightHashtags(text: string): React.ReactNode[] {
   const parts = text.split(/(\s+)/)
   return parts.map((part, i) => {
@@ -148,8 +156,11 @@ export default function SocialMedia() {
   // Media upload
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([])
+  const [mediaThumbnails, setMediaThumbnails] = useState<string[]>([]) // base64 thumbnails for videos
   const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const filteredPosts = useMemo(() =>
     socialPosts.filter(p => !search || p.title.includes(search) || p.content.includes(search)),
@@ -347,7 +358,7 @@ export default function SocialMedia() {
   }
 
   // Media upload handlers
-  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
@@ -375,8 +386,23 @@ export default function SocialMedia() {
     }
 
     if (validFiles.length > 0) {
+      // 为视频文件生成缩略图
+      const thumbnails: string[] = []
+      for (const file of validFiles) {
+        if (file.type.startsWith('video/')) {
+          try {
+            const thumb = await extractVideoThumbnail(file)
+            thumbnails.push(thumb)
+          } catch {
+            thumbnails.push('') // 占位
+          }
+        } else {
+          thumbnails.push('') // 图片不需要缩略图
+        }
+      }
       setMediaFiles(prev => [...prev, ...validFiles])
       setMediaPreviews(prev => [...prev, ...previews])
+      setMediaThumbnails(prev => [...prev, ...thumbnails])
     }
 
     // Reset input
@@ -387,6 +413,41 @@ export default function SocialMedia() {
     URL.revokeObjectURL(mediaPreviews[index])
     setMediaFiles(prev => prev.filter((_, i) => i !== index))
     setMediaPreviews(prev => prev.filter((_, i) => i !== index))
+    setMediaThumbnails(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // 从视频中截取第1秒的帧作为缩略图
+  const extractVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.muted = true
+      video.playsInline = true
+      const url = URL.createObjectURL(file)
+      video.src = url
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, video.duration * 0.1) // 第1秒或视频开头
+      }
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 320
+        canvas.height = 180
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          const thumb = canvas.toDataURL('image/jpeg', 0.7)
+          URL.revokeObjectURL(url)
+          resolve(thumb)
+        } else {
+          URL.revokeObjectURL(url)
+          resolve('')
+        }
+      }
+      video.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('视频加载失败'))
+      }
+    })
   }
 
   const uploadMediaFiles = async (): Promise<string[]> => {
@@ -1126,26 +1187,51 @@ export default function SocialMedia() {
                   {/* 已上传的媒体预览 */}
                   {mediaPreviews.length > 0 && (
                     <div className="grid grid-cols-3 gap-2">
-                      {mediaPreviews.map((preview, idx) => (
-                        <div key={idx} className="relative group">
-                          {mediaFiles[idx]?.type.startsWith('video/') ? (
-                            <video src={preview} className="w-full h-20 object-cover rounded-md bg-gray-100" controls />
-                          ) : (
-                            <img src={preview} className="w-full h-20 object-cover rounded-md" alt={`媒体${idx + 1}`} />
-                          )}
-                          <button
-                            onClick={() => handleRemoveMedia(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                          {mediaFiles[idx]?.type.startsWith('video/') && (
-                            <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] flex items-center gap-0.5">
-                              <Video className="w-2.5 h-2.5" /> 视频
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                      {mediaPreviews.map((preview, idx) => {
+                        const isVideo = mediaFiles[idx]?.type.startsWith('video/')
+                        const thumb = mediaThumbnails[idx]
+                        return (
+                          <div key={idx} className="relative group">
+                            {isVideo ? (
+                              // 视频：显示缩略图，点击打开全屏预览
+                              <div
+                                className="w-full h-20 rounded-md bg-gray-800 overflow-hidden relative cursor-pointer"
+                                onClick={() => setVideoPreviewUrl(preview)}
+                              >
+                                {thumb ? (
+                                  <img src={thumb} className="w-full h-full object-cover" alt={`视频${idx + 1}`} />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                    <Video className="w-6 h-6 text-gray-400" />
+                                  </div>
+                                )}
+                                {/* 播放按钮覆盖层 */}
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
+                                  <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+                                    <svg className="w-4 h-4 text-gray-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                  </div>
+                                </div>
+                                {/* 视频标识 */}
+                                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] flex items-center gap-0.5">
+                                  <Video className="w-2.5 h-2.5" /> {formatFileSize(mediaFiles[idx]?.size)}
+                                </div>
+                              </div>
+                            ) : (
+                              // 图片：直接显示
+                              <div className="relative">
+                                <img src={preview} className="w-full h-20 object-cover rounded-md" alt={`媒体${idx + 1}`} />
+                              </div>
+                            )}
+                            {/* 删除按钮 */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRemoveMedia(idx) }}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                   
@@ -1288,6 +1374,50 @@ export default function SocialMedia() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 视频全屏预览模态框 */}
+      <Dialog open={!!videoPreviewUrl} onOpenChange={(v) => { if (!v) setVideoPreviewUrl(null) }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0 overflow-hidden bg-black flex flex-col">
+          <div className="flex items-center justify-between p-3 bg-gray-900 shrink-0">
+            <div className="flex items-center gap-2">
+              <Video className="w-4 h-4 text-white" />
+              <span className="text-sm text-white font-medium">视频预览</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {videoPreviewUrl && (
+                <a
+                  href={videoPreviewUrl}
+                  download={`video_${Date.now()}.mp4`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  下载视频
+                </a>
+              )}
+              <Button size="sm" variant="ghost" className="text-white hover:text-white hover:bg-white/20 h-8 w-8 p-0" onClick={() => setVideoPreviewUrl(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          {videoPreviewUrl && (
+            <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+              <video
+                ref={videoRef}
+                src={videoPreviewUrl}
+                className="max-w-full max-h-[70vh] w-auto h-auto"
+                controls
+                autoPlay
+                playsInline
+              />
+            </div>
+          )}
+          <div className="p-3 bg-gray-900 shrink-0 text-center">
+            <p className="text-xs text-gray-400">
+              上传前预览效果，实际发布时请参考各平台支持的视频格式和大小限制
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

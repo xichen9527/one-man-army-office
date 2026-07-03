@@ -156,14 +156,60 @@ export default function VideoConference() {
       })
 
       if (error) throw error
+      // 检查返回的错误码
+      if (data?.error) {
+        const err = data as { error: string; code?: string; message?: string }
+        if (err.code === 'CONFIG_NOT_FOUND') {
+          toast({
+            title: 'LiveKit 未配置',
+            description: '请前往 设置 → 视频会议 配置 LiveKit Cloud 凭证',
+            variant: 'destructive'
+          })
+        } else if (err.code === 'CONFIG_INCOMPLETE') {
+          toast({
+            title: 'LiveKit 配置不完整',
+            description: '请检查 API Key、API Secret 和 Server URL 是否都已填写',
+            variant: 'destructive'
+          })
+        } else if (err.error?.includes('401') || err.error?.toLowerCase().includes('unauthorized')) {
+          toast({
+            title: 'LiveKit 凭证无效（401）',
+            description: '请检查 Settings → 视频会议 中的 LiveKit API Key 和 API Secret 是否正确',
+            variant: 'destructive'
+          })
+        } else {
+          toast({
+            title: '获取会议 Token 失败',
+            description: err.message || err.error || '请检查 LiveKit 配置',
+            variant: 'destructive'
+          })
+        }
+        return null
+      }
       return data
     } catch (error: any) {
       console.error('Failed to get LiveKit token:', error)
-      toast({
-        title: '获取会议 Token 失败',
-        description: error.message || '请检查 LiveKit 配置',
-        variant: 'destructive'
-      })
+      // 特殊处理 401 错误
+      const errMsg = error?.message || ''
+      if (errMsg.includes('401') || errMsg.toLowerCase().includes('unauthorized')) {
+        toast({
+          title: 'LiveKit 凭证无效（401）',
+          description: '请检查 Settings → 视频会议 中的 LiveKit API Key 和 API Secret',
+          variant: 'destructive'
+        })
+      } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('NetworkError')) {
+        toast({
+          title: '无法连接 LiveKit 服务器',
+          description: '请检查 Server URL 是否正确（需包含 https:// 前缀）',
+          variant: 'destructive'
+        })
+      } else {
+        toast({
+          title: '获取会议 Token 失败',
+          description: error?.message || '请检查 LiveKit 配置',
+          variant: 'destructive'
+        })
+      }
       return null
     }
   }

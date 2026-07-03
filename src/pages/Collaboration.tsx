@@ -1137,13 +1137,15 @@ export default function Collaboration() {
                 <Badge variant="secondary" className="text-[10px]">{viewingDoc?.file_type}</Badge>
               </div>
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { if (viewingDoc) navigate(`/project-management?doc=${viewingDoc.id}`) }}
-                >
-                  <ExternalLink className="w-3.5 h-3.5 mr-1" />在新页面打开
-                </Button>
+                {viewingDoc?.file_url && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { if (viewingDoc?.file_url) window.open(viewingDoc.file_url, '_blank') }}
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" />下载
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setViewingDoc(null)}>
                   <X className="w-4 h-4" />
                 </Button>
@@ -1151,36 +1153,78 @@ export default function Collaboration() {
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1">
-            {viewingDoc?.content ? (
-              <div className="p-4 text-sm text-gray-700 whitespace-pre-wrap">
-                {viewingDoc.content}
-              </div>
-            ) : viewingDoc?.file_url ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="w-16 h-16 text-gray-300 mb-4" />
-                <p className="text-sm text-gray-500 mb-4">
-                  文件类型：{viewingDoc?.file_type}，点击下方按钮下载查看
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => { if (viewingDoc?.file_url) window.open(viewingDoc.file_url, '_blank') }}
-                >
-                  <Download className="w-4 h-4 mr-1" />下载文档
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="w-16 h-16 text-gray-300 mb-4" />
-                <p className="text-sm text-gray-500">暂无内容预览，请在新页面打开</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => { if (viewingDoc) navigate(`/project-management?doc=${viewingDoc.id}`) }}
-                >
-                  <ExternalLink className="w-4 h-4 mr-1" />在新页面打开
-                </Button>
-              </div>
-            )}
+            {(() => {
+              if (!viewingDoc) return null
+              // 文本内容直接显示
+              if (viewingDoc.content) {
+                return (
+                  <div className="p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                    {viewingDoc.content}
+                  </div>
+                )
+              }
+              // 文件URL，根据类型预览
+              if (viewingDoc.file_url) {
+                const ext = viewingDoc.file_type?.toLowerCase() || ''
+                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)
+                const isPdf = ext === 'pdf'
+                if (isImage) {
+                  return (
+                    <div className="flex flex-col items-center p-4">
+                      <img
+                        src={viewingDoc.file_url}
+                        alt={viewingDoc.title}
+                        className="max-w-full max-h-[70vh] object-contain rounded"
+                      />
+                    </div>
+                  )
+                }
+                if (isPdf) {
+                  return (
+                    <iframe
+                      src={viewingDoc.file_url}
+                      className="w-full h-[70vh] border-0"
+                      title={viewingDoc.title}
+                    />
+                  )
+                }
+                // Word/Excel/其他：显示下载提示 + Office Online 预览链接
+                const officeViewerUrl = viewingDoc.file_url
+                  ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(viewingDoc.file_url)}`
+                  : null
+                return (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <FileText className="w-16 h-16 text-gray-300" />
+                    <p className="text-sm text-gray-500">
+                      文件类型：{viewingDoc.file_type || '未知'}
+                    </p>
+                    <div className="flex gap-3">
+                      {officeViewerUrl && (
+                        <Button
+                          variant="outline"
+                          onClick={() => window.open(officeViewerUrl, '_blank')}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />在线预览
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(viewingDoc.file_url, '_blank')}
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1" />下载文件
+                      </Button>
+                    </div>
+                  </div>
+                )
+              }
+              // 无内容
+              return (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mb-4" />
+                  <p className="text-sm text-gray-500">暂无内容预览</p>
+                </div>
+              )
+            })()}
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -1194,6 +1238,11 @@ export default function Collaboration() {
                 {getFileIcon(viewingFile?.file_name || '')}
                 <DialogTitle>{viewingFile?.file_name || '文件预览'}</DialogTitle>
                 <Badge variant="secondary" className="text-[10px]">{viewingFile?.file_type}</Badge>
+                {viewingFile?.file_size && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {formatFileSize(viewingFile.file_size)}
+                  </Badge>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => { if (viewingFile) handleFileClick(viewingFile) }}>
@@ -1206,7 +1255,7 @@ export default function Collaboration() {
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1">
-            <div className="flex flex-col items-center justify-center py-12">
+            <div className="flex flex-col items-center justify-center py-8">
               {(() => {
                 if (!viewingFile) return null
                 const ext = viewingFile.file_name?.split('.').pop()?.toLowerCase()
@@ -1225,12 +1274,36 @@ export default function Collaboration() {
                     </div>
                   )
                 }
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '')) {
+                // 图片直接显示
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) {
                   return <img src={url} alt={viewingFile.file_name} className="max-w-full max-h-[70vh] object-contain" />
                 }
+                // PDF 直接用 iframe
                 if (ext === 'pdf') {
                   return <iframe src={url} className="w-full h-[70vh]" title={viewingFile.file_name} />
                 }
+                // Word/Excel 使用 Office Online Viewer
+                if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext || '')) {
+                  const officeUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
+                  return (
+                    <div className="w-full flex flex-col items-center gap-4">
+                      <FileText className="w-16 h-16 text-blue-400 mx-auto" />
+                      <p className="text-sm text-gray-500">{viewingFile.file_type} 文件</p>
+                      <div className="flex gap-3">
+                        <Button variant="outline" onClick={() => window.open(officeUrl, '_blank')}>
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" />在线预览
+                        </Button>
+                        <Button variant="outline" onClick={() => handleFileClick(viewingFile)}>
+                          <Download className="w-3.5 h-3.5 mr-1" />下载文件
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Office Online Viewer 无法加载时，请直接下载文件后在本地查看
+                      </p>
+                    </div>
+                  )
+                }
+                // 其他类型
                 return (
                   <div className="text-center">
                     <File className="w-16 h-16 text-gray-300 mx-auto mb-4" />
