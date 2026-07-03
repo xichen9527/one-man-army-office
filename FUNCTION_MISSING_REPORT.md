@@ -150,6 +150,14 @@
 
 ---
 
+## ⚠️ 更新说明（2026-07-03）
+
+经过实际代码审查，以下功能已实现：
+- ✅ P0-1: CRM 销售漏斗拖拽（`handleOppDragEnd` 已调用 `updateOpportunity`）
+- ✅ P1-4: 任务看板拖拽（`handleDragEnd` 已调用 `updateTask`）
+- ✅ P1-6: AI 对话导出（`handleExportConversation` 已实现 Markdown 导出）
+- ✅ Collaboration 实时消息（store 中 `subscribeToMessages` 已实现 Supabase Realtime）
+
 ## 建议执行顺序
 
 1. **P0-1：** CRM 销售漏斗拖拽（最快修复，立竿见影）

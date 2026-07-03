@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
       rolldownOptions: {
         output: {
           manualChunks(id) {
-            // React core
+            // React core (keep together for better caching)
             if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
               return 'vendor-react'
             }
@@ -45,9 +45,25 @@ export default defineConfig(({ mode }) => {
             if (id.includes('node_modules/@supabase')) {
               return 'vendor-supabase'
             }
-            // Utilities
-            if (id.includes('node_modules/zustand') || id.includes('node_modules/date-fns')) {
+            // LiveKit (large dependency - separate for lazy loading)
+            if (id.includes('node_modules/@livekit') || id.includes('node_modules/livekit-client')) {
+              return 'vendor-livekit'
+            }
+            // Recharts (heavy chart library)
+            if (id.includes('node_modules/recharts')) {
+              return 'vendor-charts'
+            }
+            // Radix UI components
+            if (id.includes('node_modules/@radix-ui')) {
+              return 'vendor-radix'
+            }
+            // Utility libraries
+            if (id.includes('node_modules/zustand') || id.includes('node_modules/date-fns') || id.includes('node_modules/tailwindcss')) {
               return 'vendor-utils'
+            }
+            // Lucide icons (tree-shake if imported correctly)
+            if (id.includes('node_modules/lucide-react')) {
+              return 'vendor-icons'
             }
           },
         },
