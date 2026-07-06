@@ -456,8 +456,8 @@ export default function SocialMedia() {
     // 先上传媒体文件
     const mediaUrls = await uploadMediaFiles()
 
-    // 创建内容
-    await addSocialPost({
+    // 创建内容（使用返回的 ID，不再依赖 find 查找）
+    const newPostId = await addSocialPost({
       title: pf.title,
       content: pf.content,
       platform: null,
@@ -468,28 +468,34 @@ export default function SocialMedia() {
       media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     })
 
-    // 获取刚创建的内容
-    const newPost = socialPosts.find(p => p.content === pf.content)
-    if (!newPost) { setPublishError('发布失败：无法创建内容'); return }
+    if (!newPostId) {
+      setPublishError('发布失败：内容创建失败，请重试')
+      return
+    }
 
-    // 发布到选中的每个平台
+    // 发布到选中的每个平台（内容已保存，平台 OAuth 失败不影响本地记录）
+    let hasOAuthError = false
+    let hasPublishError = false
     for (const platform of selectedPlatforms) {
       const account = socialAccounts.find(a => a.platform === platform)
-      if (!account) continue
-
-      if (!account.access_token) {
-        setPublishError(`${platformNames[platform]} 未完成授权连接，请先点击「连接平台」完成OAuth授权`)
+      if (!account || !account.access_token) {
+        hasOAuthError = true
         continue
       }
 
       setPublishError(null)
       setPublishSuccess(null)
-      const result = await publishPost(newPost.id, account.id, pf.content, pf.title || undefined, platform)
+      const result = await publishPost(newPostId, account.id, pf.content, pf.title || undefined, platform)
       if (result.success) {
-        setPublishSuccess(result.post_url || `${platformNames[platform]} 发布成功！`)
+        setPublishSuccess(prev => prev ? `${prev}；${platformNames[platform]} 发布成功！` : `${platformNames[platform]} 发布成功！`)
       } else {
+        hasPublishError = true
         setPublishError(result.error || `${platformNames[platform]} 发布失败`)
       }
+    }
+
+    if (hasOAuthError) {
+      setPublishError('部分平台未完成授权，内容已保存到草稿，可在「连接平台」完成授权后重新发布')
     }
 
     setShowNewPost(false)

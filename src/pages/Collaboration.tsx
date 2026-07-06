@@ -17,7 +17,7 @@ import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import { toast } from '@/components/ui/toast'
 import { format, parseISO, differenceInMinutes, isToday, isYesterday } from 'date-fns'
-import type { ApprovalStatus } from '@/types/database'
+import type { ApprovalStatus, DBFile, Document } from '@/types/database'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 const roleLabels: Record<string, string> = { admin: '管理员', manager: '经理', member: '成员' }

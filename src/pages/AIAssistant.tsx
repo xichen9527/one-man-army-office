@@ -84,7 +84,13 @@ export default function AIAssistant() {
     } catch { setApiStatus(null) }
   }
 
-  useEffect(() => { refreshApiStatus() }, [])
+  // 初始化 + 每次标签页重新可见时刷新 API 状态（用户在 Settings 配置后切回来能立即看到）
+  useEffect(() => {
+    refreshApiStatus()
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshApiStatus() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [activeAIConv])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)

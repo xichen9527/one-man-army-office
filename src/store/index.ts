@@ -697,18 +697,44 @@ export const useStore = create<AppState>((set, get) => ({
   sendAIMessage: async (convId, content) => {
     const { data: user } = await getCachedUser()
     if (!user.user) throw new Error('请先登录')
-    
-    // 插入用户消息
-    const { data: userMsg, error: userMsgError } = await supabase.from('ai_messages').insert({
-      conversation_id: convId, role: 'user', content,
-    } as any).select().single()
-    if (userMsgError || !userMsg) throw new Error('发送用户消息失败: ' + (userMsgError?.message || '未知错误'))
 
-    // 先添加一个空的 AI 消息占位符（用于流式更新）
-    const { data: aiMsgPlaceholder, error: placeholderError } = await supabase.from('ai_messages').insert({
-      conversation_id: convId, role: 'assistant', content: '', model: 'streaming...',
-    } as any).select().single()
-    if (placeholderError || !aiMsgPlaceholder) throw new Error('创建 AI 消息失败: ' + (placeholderError?.message || '未知错误'))
+    // ---- 插入用户消息（RLS 阻止时使用本地降级，不崩溃）----
+    let userMsg: any = null
+    try {
+      const result = await supabase.from('ai_messages').insert({
+        conversation_id: convId, role: 'user', content,
+      } as any).select().single()
+      userMsg = result.data
+    } catch { /* ignore */ }
+    if (!userMsg) {
+      userMsg = {
+        id: `local-user-${Date.now()}`,
+        conversation_id: convId,
+        role: 'user',
+        content,
+        sender_id: user.user.id,
+        sender_name: null,
+        message_type: 'text',
+        is_edited: false,
+        created_at: new Date().toISOString(),
+      }
+    }
+
+    // ---- 插入 AI 消息占位符（RLS 阻止时使用本地 ID，降级流式更新）----
+    let dbPlaceholderId: string | null = null
+    const localPlaceholderId = `local-ai-${Date.now()}`
+    let placeholderId = localPlaceholderId
+    try {
+      const result = await supabase.from('ai_messages').insert({
+        conversation_id: convId, role: 'assistant', content: '', model: 'streaming...',
+      } as any).select().single()
+      if (result.data) {
+        dbPlaceholderId = result.data.id
+        placeholderId = result.data.id
+      }
+    } catch { /* ignore */ }
+
+    const aiMsgPlaceholder = { id: placeholderId, conversation_id: convId, role: 'assistant', content: '', model: 'streaming...', created_at: new Date().toISOString() }
 
     // 本地状态先加入用户消息和 AI 占位符
     set((s) => ({
@@ -755,12 +781,12 @@ export const useStore = create<AppState>((set, get) => ({
               const token = json.choices?.[0]?.delta?.content
               if (token) {
                 fullContent += token
-                // 实时更新本地状态（流式效果）
+                // 实时更新本地状态（流式效果），支持本地降级 ID
                 set((s) => ({
                   aiMessages: {
                     ...s.aiMessages,
                     [convId]: (s.aiMessages[convId] || []).map(m =>
-                      m.id === aiMsgPlaceholder.id ? { ...m, content: fullContent } : m
+                      m.id === placeholderId ? { ...m, content: fullContent } : m
                     ),
                   },
                 }))
@@ -778,7 +804,6 @@ export const useStore = create<AppState>((set, get) => ({
       .filter((m: any) => m.content && m.role)
       .slice(-20)
       .map((m: any) => ({ role: m.role, content: m.content }))
-    // 追加当前用户消息
     contextMessages.push({ role: 'user', content })
 
     let aiContent = ''
@@ -790,37 +815,27 @@ export const useStore = create<AppState>((set, get) => ({
       try {
         modelName = activeConfig.model
         const baseUrl = activeConfig.baseUrl.replace(/\/$/, '')
-        
-        // 验证配置
         if (!activeConfig.apiKey || !activeConfig.baseUrl || !activeConfig.model) {
           throw new Error('API 配置不完整，请检查 API Key、Base URL 和模型名称是否填写完整')
         }
-        
         aiContent = await tryStreamCall(
           `${baseUrl}/chat/completions`,
-          {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${activeConfig.apiKey}`,
-          },
+          { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeConfig.apiKey}` },
           { model: activeConfig.model, messages: contextMessages }
         )
         streamOk = true
       } catch (e: any) {
         const errorMsg = e.message || ''
-        
-        // 提供更详细的错误信息
         if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
-          console.warn('网络连接失败:', errorMsg)
-          throw new Error(`无法连接到 API 服务器（${activeConfig.baseUrl}），请检查：\n1. URL 是否正确\n2. 网络是否正常\n3. API 服务是否可访问`)
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Invalid API Key')) {
-          throw new Error(`API Key 无效或已过期，请前往「设置 → AI 模型」重新配置`)
-        } else if (errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('quota')) {
-          throw new Error(`API 调用次数已达上限（${errorMsg}），请：\n1. 检查账户余额\n2. 稍后重试\n3. 更换 API Key`)
+          toast.error(`无法连接到 API 服务器（${activeConfig.baseUrl}），请检查 URL 和网络`)
+        } else if (errorMsg.includes('401') || errorMsg.includes('403')) {
+          toast.error('API Key 无效或已过期，请前往「设置 → AI 模型」重新配置')
+        } else if (errorMsg.includes('429')) {
+          toast.error('API 调用次数已达上限，请检查账户余额或稍后重试')
         } else if (errorMsg.includes('timeout') || errorMsg.includes('aborted')) {
-          throw new Error(`请求超时，可能是：\n1. 网络较慢\n2. API 服务响应慢\n3. 消息内容过长\n请稍后重试或缩短输入内容`)
+          toast.error('请求超时，请稍后重试或缩短输入内容')
         } else {
           console.warn('自定义 API 流式调用失败:', errorMsg)
-          // 不抛出错误，继续尝试降级方案
         }
       }
     }
@@ -829,7 +844,6 @@ export const useStore = create<AppState>((set, get) => ({
     if (!streamOk) {
       try {
         const edgeUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-generation`
-        
         if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
           console.warn('Supabase 环境变量未配置，跳过 Edge Function')
         } else {
@@ -864,54 +878,48 @@ export const useStore = create<AppState>((set, get) => ({
             body: JSON.stringify({ model: activeConfig.model, messages: contextMessages, stream: false }),
             signal: AbortSignal.timeout(60000),
           })
-          
           if (!resp.ok) {
             const errData = await resp.json().catch(() => ({}))
-            const errMsg = errData.error?.message || errData.message || `HTTP ${resp.status}`
-            throw new Error(`API 调用失败：${errMsg}`)
+            throw new Error(errData.error?.message || errData.message || `HTTP ${resp.status}`)
           }
-          
           const json = await resp.json()
           aiContent = json.choices?.[0]?.message?.content || ''
-          
-          if (!aiContent) {
-            throw new Error('API 返回内容为空，请检查模型配置是否正确')
-          }
-          
+          if (!aiContent) throw new Error('API 返回内容为空，请检查模型配置是否正确')
           modelName = activeConfig.model
         }
       } catch (e: any) {
         console.warn('非流式调用失败:', e.message)
-        // 只在最后一次尝试时抛出错误，让用户知道发生了什么
         if (activeConfig) {
-          // 更新占位符消息为错误信息
-          await supabase.from('ai_messages').update({
-            content: `⚠️ AI 调用失败\n\n错误信息：${e.message || '未知错误'}\n\n请检查：\n1. API Key 是否有效\n2. Base URL 是否正确\n3. 模型名称是否存在\n4. 账户余额是否充足\n\n前往「设置 → AI 模型」重新配置`,
-            model: 'error',
-          } as any).eq('id', aiMsgPlaceholder.id)
-          
+          // 只更新数据库中的占位符消息（本地降级 ID 跳过）
+          if (dbPlaceholderId) {
+            await supabase.from('ai_messages').update({
+              content: `⚠️ AI 调用失败\n\n${e.message || '未知错误'}\n\n请检查 API 配置后重试`,
+              model: 'error',
+            } as any).eq('id', dbPlaceholderId).select().single()
+          }
           throw new Error(`AI 调用失败：${e.message || '未知错误'}`)
         }
       }
 
       if (!aiContent && !activeConfig) {
-        aiContent = `[开发模式] 已收到您的消息：${content}\n\n当前 AI 服务未配置。请在「设置 → AI 模型」中添加您的 API Key 以启用真实 AI 对话。`
+        aiContent = `[开发模式] 已收到您的消息：${content}\n\n当前 AI 服务未配置。请在「设置 → AI 模型」中添加您的 API Key 以启用 AI 对话。`
         modelName = 'dev-mode'
       }
     }
 
-    // 最终更新：把完整内容写入数据库
-    const { data: aiMsgFinal, error: aiMsgError } = await supabase.from('ai_messages').update({
-      content: aiContent, model: modelName,
-    } as any).eq('id', aiMsgPlaceholder.id).select().single()
-    if (aiMsgError) toast.error('更新 AI 消息失败:', aiMsgError)
+    // 最终更新：把完整内容写入数据库（仅对 DB 记录的占位符，本地 ID 跳过）
+    if (dbPlaceholderId) {
+      await supabase.from('ai_messages').update({
+        content: aiContent, model: modelName,
+      } as any).eq('id', dbPlaceholderId).select().single()
+    }
 
-    // 更新本地状态为最终内容
+    // 更新本地状态为最终内容（统一路径，无论 DB 是否可用）
     set((s) => ({
       aiMessages: {
         ...s.aiMessages,
         [convId]: (s.aiMessages[convId] || []).map(m =>
-          m.id === aiMsgPlaceholder.id ? (aiMsgFinal || { ...aiMsgPlaceholder, content: aiContent, model: modelName }) : m
+          m.id === placeholderId ? { ...m, content: aiContent, model: modelName } : m
         ),
       },
     }))
