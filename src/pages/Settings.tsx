@@ -29,6 +29,7 @@ import {
   Save
 } from 'lucide-react'
 import { useStore } from '@/store'
+import { supabase } from '@/db/supabase'
 
 // 密码强度类型
 type PasswordStrength = 'weak' | 'medium' | 'strong'
@@ -97,8 +98,7 @@ export default function Settings() {
   // 加载邮箱修改次数
   const loadEmailChangeCount = async () => {
     if (!currentUser?.id) return
-    const { supabase: sb } = await import('@/db/supabase')
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from('profiles')
       .select('email_change_count')
       .eq('id', currentUser.id)
@@ -255,14 +255,12 @@ export default function Settings() {
       // 裁切为200×200圆形
       const croppedBlob = await cropAvatar(file)
 
-      const { supabase: sb } = await import('@/db/supabase')
-      
       // 生成唯一文件名
       const fileName = `${currentUser?.id}-avatar.png`
       const filePath = `${fileName}`
 
       // 上传裁切后的图片到 Supabase Storage
-      const { error: uploadError } = await sb.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, croppedBlob, {
           cacheControl: '3600',
@@ -275,7 +273,7 @@ export default function Settings() {
       }
 
       // 获取公共 URL
-      const { data: { publicUrl } } = sb.storage
+      const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath)
 
@@ -294,8 +292,7 @@ export default function Settings() {
         setAvatarUrl(publicUrl)
         
         // 重新加载用户信息
-        const storeState = (await import('@/store')).useStore.getState()
-        await storeState.loadUser()
+        useStore.getState().loadUser()
       }
 
       toast({ title: '头像上传成功！', variant: 'success' })
@@ -364,9 +361,8 @@ export default function Settings() {
 
   const handleEnable2FA = async () => {
     try {
-      const { supabase: sb } = await import('@/db/supabase')
       // 更新 profiles 表的 2FA 设置
-      const { error } = await sb
+      const { error } = await supabase
         .from('profiles')
         .update({ two_factor_enabled: true })
         .eq('id', currentUser?.id)
@@ -383,8 +379,7 @@ export default function Settings() {
 
   const handleDisable2FA = async () => {
     try {
-      const { supabase: sb } = await import('@/db/supabase')
-      const { error } = await sb
+      const { error } = await supabase
         .from('profiles')
         .update({ two_factor_enabled: false })
         .eq('id', currentUser?.id)
@@ -400,7 +395,6 @@ export default function Settings() {
 
   // 保存个人资料
   const handleSaveProfile = async () => {
-    const { supabase: sb } = await import('@/db/supabase')
     const updates: Record<string, string> = {}
     if (fullName !== currentUser?.full_name) updates.full_name = fullName
     if (username !== currentUser?.username) updates.username = username
@@ -418,7 +412,7 @@ export default function Settings() {
       }
       
       try {
-        const { error: emailError } = await sb.auth.updateUser({ email })
+        const { error: emailError } = await supabase.auth.updateUser({ email })
         if (emailError) {
           // 友好错误提示：检测邮箱已注册
           const isAlreadyRegistered = emailError?.message?.includes('already been registered') ||
@@ -433,7 +427,7 @@ export default function Settings() {
         
         // 邮箱更新成功，增加修改次数
         const newCount = emailChangeCount + 1
-        await sb.from('profiles').update({
+        await supabase.from('profiles').update({
           email_change_count: newCount,
           last_email_change_at: new Date().toISOString()
         }).eq('id', currentUser.id)
@@ -453,11 +447,10 @@ export default function Settings() {
     }
     
     if (Object.keys(updates).length > 0 && currentUser?.id) {
-      await sb.from('profiles').update(updates).eq('id', currentUser.id)
-      const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single()
+      await supabase.from('profiles').update(updates).eq('id', currentUser.id)
+      const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single()
       if (data) {
-        const storeState = (await import('@/store')).useStore.getState()
-        storeState.loadUser()
+        useStore.getState().loadUser()
       }
     }
     setSaved(true)
@@ -483,8 +476,7 @@ export default function Settings() {
       return
     }
     
-    const { supabase: sb } = await import('@/db/supabase')
-    const { error } = await sb.auth.updateUser({ password: np })
+    const { error } = await supabase.auth.updateUser({ password: np })
     if (error) {
       toast({ title: '修改失败', description: error.message, variant: 'destructive' })
     } else {

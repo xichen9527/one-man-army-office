@@ -37,6 +37,21 @@ const getCachedUser = async () => {
   return _userCache
 }
 
+// ==================== 403 / RLS Error Handler ====================
+// Detects Supabase RLS 403 errors and shows a user-friendly toast.
+// Returns true if the error was a 403 (caller should return/gracefully degrade).
+function handleRLSError(context: string, error: any): boolean {
+  const code = error?.code || ''
+  const is403 = code === '403' || code === 'PGRST301' || code === '42501' || error?.message?.includes('403')
+  if (is403) {
+    console.warn(`[store] RLS 403 for ${context}:`, error?.message)
+    toast.error(`数据加载失败（权限不足），请检查 Supabase RLS 策略设置`)
+    return true
+  }
+  toast.error(`${context} failed: ${error?.message || '[unknown error]'}`)
+  return false
+}
+
 // ==================== Store State ====================
 interface AppState {
   // Auth
@@ -279,7 +294,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('projects').select('*').eq('owner_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchProjects failed: ' + (error?.message || 'fetchProjects failed:')); return }
+      if (error) { handleRLSError('fetchProjects', error); return }
       set({ projects: (data as Project[] | null) || [] })
     } catch (e) { toast.error('fetchProjects failed: ' + (e?.message || 'fetchProjects failed:')) }
   },
@@ -311,7 +326,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('tasks').select('*').eq('creator_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchTasks failed: ' + (error?.message || 'fetchTasks failed:')); return }
+      if (error) { handleRLSError('fetchTasks', error); return }
       set({ tasks: (data as Task[] | null) || [] })
     } catch (e) { toast.error('fetchTasks failed: ' + (e?.message || 'fetchTasks failed:')) }
   },
@@ -346,7 +361,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
-      if (error) { toast.error('fetchDocuments failed: ' + (error?.message || 'fetchDocuments failed:')); return }
+      if (error) { handleRLSError('fetchDocuments', error); return }
       set({ documents: (data as Document[] | null) || [] })
     } catch (e) { toast.error('fetchDocuments failed: ' + (e?.message || 'fetchDocuments failed:')) }
   },
@@ -383,7 +398,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: publicData, error: publicError } = await supabase.from('channels').select('*').eq('is_private', false).order('created_at')
       const allData = [...(data || []), ...((publicData || [])).filter(p => !(data || []).some(c => c.id === p.id))]
       const mergedError = error || publicError
-      if (mergedError) { toast.error('fetchChannels failed:', mergedError); return }
+      if (mergedError) { handleRLSError('fetchChannels', mergedError); return }
       set({ channels: (allData as Channel[] | null) || [] })
       const state = get()
       if (allData && allData.length > 0 && !state.activeChannel) {
@@ -426,7 +441,7 @@ export const useStore = create<AppState>((set, get) => ({
   fetchMessages: async (channelId) => {
     try {
       const { data, error } = await supabase.from('messages').select('*').eq('channel_id', channelId).order('created_at').limit(200)
-      if (error) { toast.error('fetchMessages failed: ' + (error?.message || 'fetchMessages failed:')); return }
+      if (error) { handleRLSError('fetchMessages', error); return }
       set((s) => ({ messages: { ...s.messages, [channelId]: (data as Message[] | null) || [] } }))
     } catch (e) { toast.error('fetchMessages failed: ' + (e?.message || 'fetchMessages failed:')) }
   },
@@ -498,14 +513,14 @@ export const useStore = create<AppState>((set, get) => ({
       invited_at: m.invited_at || new Date().toISOString(),
     }))
     set({ members: enriched })
-    } catch (e) { toast.error('fetchTeamMembers failed: ' + (e?.message || 'fetchTeamMembers failed:')) }
+    } catch (e: any) { handleRLSError('fetchTeamMembers', e) }
   },
   fetchInvitations: async () => {
     try {
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('invitations').select('*').eq('team_owner_id', user.user.id)
-      if (error) { toast.error('fetchInvitations failed: ' + (error?.message || 'fetchInvitations failed:')); return }
+      if (error) { handleRLSError('fetchInvitations', error); return }
       set({ invitations: (data as Invitation[] | null) || [] })
     } catch (e) { toast.error('fetchInvitations failed: ' + (e?.message || 'fetchInvitations failed:')) }
   },
@@ -554,7 +569,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('customers').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchCustomers failed: ' + (error?.message || 'fetchCustomers failed:')); return }
+      if (error) { handleRLSError('fetchCustomers', error); return }
       set({ customers: (data as Customer[] | null) || [] })
     } catch (e) { toast.error('fetchCustomers failed: ' + (e?.message || 'fetchCustomers failed:')) }
   },
@@ -587,7 +602,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('sales_opportunities').select('*').eq('assigned_to', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchSalesOpportunities failed: ' + (error?.message || 'fetchSalesOpportunities failed:')); return }
+      if (error) { handleRLSError('fetchSalesOpportunities', error); return }
       set({ salesOpportunities: (data as SalesOpportunity[] | null) || [] })
     } catch (e) { toast.error('fetchSalesOpportunities failed: ' + (e?.message || 'fetchSalesOpportunities failed:')) }
   },
@@ -622,7 +637,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('followups').select('*').eq('customer_id', customerId).eq('user_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchFollowups failed: ' + (error?.message || 'fetchFollowups failed:')); return }
+      if (error) { handleRLSError('fetchFollowups', error); return }
       set((s) => ({ followups: { ...s.followups, [customerId]: (data as Followup[] | null) || [] } }))
     } catch (e) { toast.error('fetchFollowups failed: ' + (e?.message || 'fetchFollowups failed:')) }
   },
@@ -653,14 +668,14 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('ai_conversations').select('*').eq('user_id', user.user.id).order('updated_at', { ascending: false })
-      if (error) { toast.error('fetchAIConversations failed: ' + (error?.message || 'fetchAIConversations failed:')); return }
+      if (error) { handleRLSError('fetchAIConversations', error); return }
       set({ aiConversations: (data as AIConversation[] | null) || [] })
     } catch (e) { toast.error('fetchAIConversations failed: ' + (e?.message || 'fetchAIConversations failed:')) }
   },
   fetchAIMessages: async (convId) => {
     try {
       const { data, error } = await supabase.from('ai_messages').select('*').eq('conversation_id', convId).order('created_at')
-      if (error) { toast.error('fetchAIMessages failed: ' + (error?.message || 'fetchAIMessages failed:')); return }
+      if (error) { handleRLSError('fetchAIMessages', error); return }
       set((s) => ({ aiMessages: { ...s.aiMessages, [convId]: (data as AIMessage[] | null) || [] } }))
     } catch (e) { toast.error('fetchAIMessages failed: ' + (e?.message || 'fetchAIMessages failed:')) }
   },
@@ -929,7 +944,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('social_accounts').select('*').eq('user_id', user.user.id).order('created_at')
-      if (error) { toast.error('fetchSocialAccounts failed: ' + (error?.message || 'fetchSocialAccounts failed:')); return }
+      if (error) { handleRLSError('fetchSocialAccounts', error); return }
       set({ socialAccounts: (data as SocialAccount[] | null) || [] })
     } catch (e) { toast.error('fetchSocialAccounts failed: ' + (e?.message || 'fetchSocialAccounts failed:')) }
   },
@@ -938,7 +953,7 @@ export const useStore = create<AppState>((set, get) => ({
       let query = supabase.from('social_media_posts').select('*').order('created_at', { ascending: false })
       if (accountId) query = query.eq('account_id', accountId)
       const { data, error } = await query
-      if (error) { toast.error('fetchSocialPosts failed: ' + (error?.message || 'fetchSocialPosts failed:')); return }
+      if (error) { handleRLSError('fetchSocialPosts', error); return }
       set({ socialPosts: (data as SocialPost[] | null) || [] })
     } catch (e) { toast.error('fetchSocialPosts failed: ' + (e?.message || 'fetchSocialPosts failed:')) }
   },
@@ -953,14 +968,14 @@ export const useStore = create<AppState>((set, get) => ({
       let query = supabase.from('social_post_platforms').select('*').in('account_id', accountIds)
       if (postId) query = query.eq('post_id', postId)
       const { data, error } = await query
-      if (error) { toast.error('fetchSocialPostPlatforms failed: ' + (error?.message || 'fetchSocialPostPlatforms failed:')); return }
+      if (error) { handleRLSError('fetchSocialPostPlatforms', error); return }
       set({ socialPostPlatforms: (data as SocialPostPlatform[] | null) || [] })
     } catch (e) { toast.error('fetchSocialPostPlatforms failed: ' + (e?.message || 'fetchSocialPostPlatforms failed:')) }
   },
   fetchTrendingTopics: async () => {
     try {
       const { data, error } = await supabase.from('trending_topics').select('*').order('heat', { ascending: false }).limit(50)
-      if (error) { toast.error('fetchTrendingTopics failed: ' + (error?.message || 'fetchTrendingTopics failed:')); return }
+      if (error) { handleRLSError('fetchTrendingTopics', error); return }
       set({ trendingTopics: (data as TrendingTopic[] | null) || [] })
     } catch (e) { toast.error('fetchTrendingTopics failed: ' + (e?.message || 'fetchTrendingTopics failed:')) }
   },
@@ -1156,7 +1171,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (!user.user) return
       // RLS policy handles filtering: host or participant can see
       const { data, error } = await supabase.from('video_conferences').select('*').order('created_at', { ascending: false })
-      if (error) { toast.error('fetchConferences failed: ' + (error?.message || 'fetchConferences failed:')); return }
+      if (error) { handleRLSError('fetchConferences', error); return }
       set({ conferences: (data as Conference[] | null) || [] })
     } catch (e) { toast.error('fetchConferences failed: ' + (e?.message || 'fetchConferences failed:')) }
   },
@@ -1191,7 +1206,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { data: user } = await getCachedUser()
       if (!user.user) return
       const { data, error } = await supabase.from('notifications').select('*').eq('user_id', user.user.id).order('created_at', { ascending: false })
-      if (error) { toast.error('fetchNotifications failed: ' + (error?.message || 'fetchNotifications failed:')); return }
+      if (error) { handleRLSError('fetchNotifications', error); return }
       set({ notifications: (data as Notification[] | null) || [] })
     } catch (e) { toast.error('fetchNotifications failed: ' + (e?.message || 'fetchNotifications failed:')) }
   },
@@ -1221,7 +1236,7 @@ export const useStore = create<AppState>((set, get) => ({
         .from('approvals')
         .select('*')
         .order('created_at', { ascending: false })
-      if (error) { toast.error('fetchApprovals failed: ' + (error?.message || 'fetchApprovals failed:')); return }
+      if (error) { handleRLSError('fetchApprovals', error); return }
       set({ approvals: (data as ApprovalRequest[] | null) || [] })
     } catch (e) { toast.error('fetchApprovals failed: ' + (e?.message || 'fetchApprovals failed:')) }
   },
@@ -1265,7 +1280,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (projectId) query = query.eq('project_id', projectId)
       if (taskId) query = query.eq('task_id', taskId)
       const { data, error } = await query
-      if (error) { toast.error('fetchFiles failed: ' + (error?.message || 'fetchFiles failed:')); return }
+      if (error) { handleRLSError('fetchFiles', error); return }
       set({ files: (data as DBFile[] | null) || [] })
     } catch (e) { toast.error('fetchFiles failed: ' + (e?.message || 'fetchFiles failed:')) }
   },

@@ -73,7 +73,7 @@ export default function Collaboration() {
 
 
 
-  const handleFileClick = (file) => {
+  const handleFileClick = (file: DBFile) => {
     const { data, error } = supabase.storage.from('files').getPublicUrl(file.file_path)
     if (error) {
       toast({ title: '无法打开文件', description: error.message, variant: 'destructive' })
