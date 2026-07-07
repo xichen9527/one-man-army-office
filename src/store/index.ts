@@ -40,17 +40,35 @@ const getCachedUser = async () => {
 // ==================== 403 / RLS Error Handler ====================
 // Detects Supabase RLS 403 errors and shows a user-friendly toast.
 // Returns true if the error was a 403 (caller should return/gracefully degrade).
+// 会话级别去重：每个错误类型只提示一次
+const _toastDedup = new Set<string>()
+function _dedupToast(key: string, message: string) {
+  if (_toastDedup.has(key)) return
+  _toastDedup.add(key)
+  toast.error(message)
+}
+
 function handleRLSError(context: string, error: any): boolean {
   const code = error?.code || ''
   const is403 = code === '403' || code === 'PGRST301' || code === '42501' || error?.message?.includes('403')
+  const isNetwork = error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError') || error?.message?.includes('net::')
   if (is403) {
     console.warn(`[store] RLS 403 for ${context}:`, error?.message)
-    toast.error(`数据加载失败（权限不足），请检查 Supabase RLS 策略设置`)
+    _dedupToast('rls-403', `数据加载失败（${context}），请检查 Supabase RLS 策略设置`)
     return true
   }
-  toast.error(`${context} failed: ${error?.message || '[unknown error]'}`)
+  if (isNetwork) {
+    _dedupToast('network', `网络连接失败，请检查网络后刷新页面`)
+    return true
+  }
+  // 非 403/网络错误仍然显示，但带上下文
+  const msg = error?.message || '[unknown error]'
+  _dedupToast(`err-${context}`, `${context} failed: ${msg}`)
   return false
 }
+
+// 清除会话级别去重记录（登录/登出时调用）
+function clearToastDedup() { _toastDedup.clear() }
 
 // ==================== Store State ====================
 interface AppState {
@@ -205,11 +223,15 @@ export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
   isAuthenticated: false,
   loading: true,
+  dataLoadError: null as string | null,
+  setDataLoadError: (_: string | null) => {},
+  setDataLoadError: (msg: string | null) => set({ dataLoadError: msg }),
+  clearDataLoadError: () => { clearToastDedup(); set({ dataLoadError: null }) },
 
   loadUser: async () => {
-    set({ loading: true })
+    set({ loading: true, dataLoadError: null })
+    clearToastDedup()
     try {
-      // Timeout wrapper to prevent infinite loading
       const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
         return Promise.race([
           promise,
@@ -220,23 +242,36 @@ export const useStore = create<AppState>((set, get) => ({
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         set({ currentUser: profile ? { ...profile, avatar: profile.avatar_url || undefined } : null, isAuthenticated: true, loading: false })
-        get().fetchProjects()
-        get().fetchTasks()
-        get().fetchDocuments()
-        get().fetchChannels()
-        get().fetchNotifications()
-        get().fetchCustomers()
-        get().fetchSalesOpportunities()
-        get().fetchSocialAccounts()
-        get().fetchSocialPosts()
-        get().fetchSocialPostPlatforms()
-        get().fetchConferences()
-        get().fetchAIConversations()
-        get().fetchTeamMembers()
-        get().fetchInvitations()
-        get().fetchApprovals()
-        get().fetchFiles()
-        get().fetchTrendingTopics()
+
+        // 并发加载所有数据，统一 catch（不再每个都弹 toast）
+        const fetches = [
+          get().fetchProjects(),
+          get().fetchTasks(),
+          get().fetchDocuments(),
+          get().fetchChannels(),
+          get().fetchNotifications(),
+          get().fetchCustomers(),
+          get().fetchSalesOpportunities(),
+          get().fetchSocialAccounts(),
+          get().fetchSocialPosts(),
+          get().fetchSocialPostPlatforms(),
+          get().fetchConferences(),
+          get().fetchAIConversations(),
+          get().fetchTeamMembers(),
+          get().fetchInvitations(),
+          get().fetchApprovals(),
+          get().fetchFiles(),
+          get().fetchTrendingTopics(),
+        ]
+
+        const results = await Promise.allSettled(fetches)
+        const failures = results.filter(r => r.status === 'rejected')
+        if (failures.length > 0) {
+          console.warn(`[loadUser] ${failures.length}/${results.length} fetches failed`)
+          // 仅在有失败时设置错误提示，UI 显示统一 banner
+          set({ dataLoadError: `${failures.length} 个模块数据加载失败，请检查网络或 RLS 策略` })
+        }
+
         // 登录后自动建立 realtime 订阅
         get().subscribeToConferences()
         get().subscribeToNotifications(session.user.id)
@@ -270,12 +305,13 @@ export const useStore = create<AppState>((set, get) => ({
       return { __conferenceChannel: null, __notificationChannel: null } as any
     })
     await supabase.auth.signOut()
+    clearToastDedup()
     set({
       currentUser: null, isAuthenticated: false,
       projects: [], tasks: [], documents: [], channels: [], messages: {},
       notifications: [], aiConversations: [], socialAccounts: [], socialPosts: [], socialPostPlatforms: [],
       conferences: [], customers: [], salesOpportunities: [], members: [], invitations: [], files: [],
-      approvals: [],
+      approvals: [], dataLoadError: null,
     })
   },
   updatePassword: async (newPassword) => {
