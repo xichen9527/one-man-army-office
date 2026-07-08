@@ -55,7 +55,11 @@ export default function Settings() {
   const [emailChangeCount, setEmailChangeCount] = useState(0)
   const [emailChangeLimitReached, setEmailChangeLimitReached] = useState(false)
   const MAX_EMAIL_CHANGES = 2
-  
+
+  // 邮箱 pending 状态
+  const [emailChangePending, setEmailChangePending] = useState<string | null>(null)
+  const [emailSending, setEmailSending] = useState(false)
+
   // 浏览器通知状态
   const [browserNotification, setBrowserNotification] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
@@ -95,20 +99,46 @@ export default function Settings() {
     loadEmailChangeCount()
   }, [currentUser?.id])
   
-  // 加载邮箱修改次数
-  const loadEmailChangeCount = async () => {
+  // 加载邮箱修改次数和 pending 状态
+  const loadEmailChangeStatus = useCallback(async () => {
     if (!currentUser?.id) return
     const { data, error } = await supabase
       .from('profiles')
-      .select('email_change_count')
+      .select('email_change_count, email_change_pending')
       .eq('id', currentUser.id)
       .single()
     if (data && !error) {
       const count = data.email_change_count || 0
       setEmailChangeCount(count)
       setEmailChangeLimitReached(count >= MAX_EMAIL_CHANGES)
+      setEmailChangePending(data.email_change_pending || null)
     }
-  }
+  }, [currentUser?.id])
+
+  const loadEmailChangeCount = loadEmailChangeStatus
+
+  // 每 10s 轮询 pending 状态
+  useEffect(() => {
+    if (!currentUser?.id || emailChangePending === null) return
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('email_change_pending, email')
+        .eq('id', currentUser.id)
+        .single()
+      if (data && !data.email_change_pending && emailChangePending) {
+        // pending 已被清除，说明邮箱修改已确认
+        setEmailChangePending(null)
+        useStore.getState().loadUser()
+        toast({
+          title: '邮箱修改成功！',
+          description: `您的邮箱已更新。`,
+          variant: 'success',
+        })
+      }
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [currentUser?.id, emailChangePending])
 
   // 应用主题
   useEffect(() => {
@@ -279,7 +309,7 @@ export default function Settings() {
 
       // 更新 profiles 表的 avatar_url
       if (currentUser?.id) {
-        const { error: updateError } = await sb
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({ avatar_url: publicUrl })
           .eq('id', currentUser.id)
@@ -411,38 +441,32 @@ export default function Settings() {
         return
       }
       
+      // 发送确认邮件（通过 Edge Function）
+      setEmailSending(true)
       try {
-        const { error: emailError } = await supabase.auth.updateUser({ email })
-        if (emailError) {
-          // 友好错误提示：检测邮箱已注册
-          const isAlreadyRegistered = emailError?.message?.includes('already been registered') ||
-            emailError?.message?.includes('Already used')
-          toast({
-            title: isAlreadyRegistered ? '邮箱更新失败' : '邮箱更新失败',
-            description: isAlreadyRegistered ? '该邮箱已被其他用户注册，请换一个邮箱试试' : emailError.message,
-            variant: 'destructive',
-          })
-          return
-        }
-        
-        // 邮箱更新成功，增加修改次数
-        const newCount = emailChangeCount + 1
-        await supabase.from('profiles').update({
-          email_change_count: newCount,
-          last_email_change_at: new Date().toISOString()
-        }).eq('id', currentUser.id)
-        setEmailChangeCount(newCount)
-        setEmailChangeLimitReached(newCount >= MAX_EMAIL_CHANGES)
-        
-        // 友好提示：Supabase 会自动发送确认邮件到新邮箱
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('send-email-confirmation', {
+          body: { userId: currentUser.id, newEmail: email }
+        })
+        if (fnError) throw fnError
+        if (fnData?.error) throw new Error(fnData.message || fnData.error)
+
+        // Edge Function 已保存 email_change_pending / token
+        setEmailChangePending(email)
+
         toast({
           title: '✅ 已发送确认邮件',
-          description: `请登录「${email}」查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）\n\n剩余修改次数：${MAX_EMAIL_CHANGES - newCount}/${MAX_EMAIL_CHANGES}`,
+          description: `请登录「${email}」查收验证链接，点击链接后新邮箱才会生效。\n（如未收到，请检查垃圾邮件）\n\n剩余修改次数：${MAX_EMAIL_CHANGES - emailChangeCount}/${MAX_EMAIL_CHANGES}`,
           variant: 'success',
         })
-      } catch (e: any) {
-        toast({ title: '邮箱更新失败', description: e.message || '未知错误', variant: 'destructive' })
+      } catch (efError: any) {
+        toast({
+          title: '发送确认邮件失败',
+          description: efError.message || '未知错误，请稍后重试',
+          variant: 'destructive',
+        })
         return
+      } finally {
+        setEmailSending(false)
       }
     }
     
@@ -645,17 +669,32 @@ export default function Settings() {
                       您已用完所有邮箱修改次数，如需修改请联系管理员
                     </p>
                   )}
+                  {emailChangePending && (
+                    <div className="flex items-center gap-2 mt-1 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                      <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                      <span className="text-xs text-amber-700">
+                        等待确认：新邮箱 <strong>{emailChangePending}</strong> 尚未生效，请登录该邮箱查收确认邮件
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <Button onClick={handleSaveProfile}>
+              <Button onClick={handleSaveProfile} disabled={emailSending}>
                 {saved ? (
                   <>
                     <Check className="mr-2 h-4 w-4" />
                     已保存
                   </>
                 ) : (
-                  '保存修改'
+                  emailSending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      发送确认邮件...
+                    </>
+                  ) : (
+                    '保存修改'
+                  )
                 )}
               </Button>
             </CardContent>

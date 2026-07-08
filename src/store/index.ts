@@ -209,10 +209,13 @@ interface AppState {
   __messageChannel: any
   __conferenceChannel: any
   __notificationChannel: any
+  __socialPostsChannel: any
   subscribeToMessages: (channelId: string) => void
   unsubscribeMessages: () => void
   subscribeToConferences: () => void
   subscribeToNotifications: (userId: string) => void
+  subscribeToSocialPosts: () => void
+  unsubscribeSocialPosts: () => void
 }
 
 export type ConferenceStatus = Conference['status']
@@ -224,7 +227,6 @@ export const useStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
   loading: true,
   dataLoadError: null as string | null,
-  setDataLoadError: (_: string | null) => {},
   setDataLoadError: (msg: string | null) => set({ dataLoadError: msg }),
   clearDataLoadError: () => { clearToastDedup(); set({ dataLoadError: null }) },
 
@@ -299,10 +301,12 @@ export const useStore = create<AppState>((set, get) => ({
 
   signOut: async () => {
     get().unsubscribeMessages()
+    get().unsubscribeSocialPosts()
     set((s: any) => {
       if (s.__conferenceChannel) supabase.removeChannel(s.__conferenceChannel)
       if (s.__notificationChannel) supabase.removeChannel(s.__notificationChannel)
-      return { __conferenceChannel: null, __notificationChannel: null } as any
+      if (s.__socialPostsChannel) supabase.removeChannel(s.__socialPostsChannel)
+      return { __conferenceChannel: null, __notificationChannel: null, __socialPostsChannel: null } as any
     })
     await supabase.auth.signOut()
     clearToastDedup()
@@ -1481,12 +1485,90 @@ export const useStore = create<AppState>((set, get) => ({
     })
   },
 
+  // ========== Social Posts Realtime Subscription ==========
+  unsubscribeSocialPosts: () => {
+    set((s) => {
+      const ch = (s as any).__socialPostsChannel
+      if (ch) supabase.removeChannel(ch)
+      return { __socialPostsChannel: null } as any
+    })
+  },
+
+  subscribeToSocialPosts: () => {
+    get().unsubscribeSocialPosts()
+    const ch = supabase
+      .channel('social-posts-realtime')
+      // 监听 social_media_posts 表变化（主表状态同步）
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'social_media_posts',
+      }, (payload: any) => {
+        if (payload.eventType === 'UPDATE') {
+          const updated = payload.new
+          set((s) => ({
+            socialPosts: s.socialPosts.map((p: SocialPost) =>
+              p.id === updated.id ? { ...p, ...updated } : p
+            ),
+          }))
+          // 同步到 socialPostPlatforms
+          if (updated.status) {
+            set((s) => ({
+              socialPostPlatforms: s.socialPostPlatforms.map((pp: SocialPostPlatform) =>
+                pp.post_id === updated.id && pp.status === 'scheduled'
+                  ? { ...pp, status: updated.status as any }
+                  : pp
+              ),
+            }))
+          }
+        } else if (payload.eventType === 'INSERT') {
+          const newPost = payload.new
+          set((s) => ({
+            socialPosts: s.socialPosts.some((p: SocialPost) => p.id === newPost.id)
+              ? s.socialPosts
+              : [newPost, ...s.socialPosts],
+          }))
+        } else if (payload.eventType === 'DELETE') {
+          const deleted = payload.old
+          set((s) => ({
+            socialPosts: s.socialPosts.filter((p: SocialPost) => p.id !== deleted.id),
+          }))
+        }
+      })
+      // 监听 social_post_platforms 表变化（平台级别状态同步）
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'social_post_platforms',
+      }, (payload: any) => {
+        if (payload.eventType === 'UPDATE') {
+          const updated = payload.new
+          set((s) => ({
+            socialPostPlatforms: s.socialPostPlatforms.map((pp: SocialPostPlatform) =>
+              pp.id === updated.id ? { ...pp, ...updated } : pp
+            ),
+          }))
+        } else if (payload.eventType === 'INSERT') {
+          const newPp = payload.new
+          set((s) => ({
+            socialPostPlatforms: s.socialPostPlatforms.some((pp: SocialPostPlatform) => pp.id === newPp.id)
+              ? s.socialPostPlatforms
+              : [newPp, ...s.socialPostPlatforms],
+          }))
+        }
+      })
+      .subscribe()
+
+    set((s) => ({ __socialPostsChannel: ch } as any))
+  },
+
 }))
 
 // 初始化：监听认证状态变化
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
     useStore.getState().loadUser()
+    useStore.getState().subscribeToSocialPosts()  // 实时同步定时发布状态
   }
   if (event === 'SIGNED_OUT') {
     useStore.getState().signOut()

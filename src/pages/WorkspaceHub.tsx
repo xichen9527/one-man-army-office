@@ -90,6 +90,7 @@ export default function WorkspaceHub() {
   const [msgInput, setMsgInput] = useState('')
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const msgInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

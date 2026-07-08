@@ -4,20 +4,20 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   MessageSquare, Hash, Lock, Plus, Send, Users, UserPlus,
   Trash2, Mail, Crown, Shield, UserCheck, ListTodo, FolderOpen, Edit3, X,
   MoreVertical, Reply, Paperclip, Download, File, FileText, Image,
-  ClipboardCheck, CheckCircle2, XCircle, Clock
+  ClipboardCheck, CheckCircle2, XCircle, Clock, ExternalLink, GitMerge
 } from 'lucide-react'
 
 import { useStore } from '@/store'
 import { supabase } from '@/db/supabase'
 import { toast } from '@/components/ui/toast'
 import { format, parseISO, differenceInMinutes, isToday, isYesterday } from 'date-fns'
-import type { ApprovalStatus, DBFile, Document } from '@/types/database'
+import type { ApprovalStatus, DBFile, Document, TeamMember } from '@/types/database'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 const roleLabels: Record<string, string> = { admin: '管理员', manager: '经理', member: '成员' }
@@ -53,7 +53,6 @@ export default function Collaboration() {
   // @mention state
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOpen, setMentionOpen] = useState(false)
-  const [, setMentionPosition] = useState({ top: 0, left: 0 })
   const mentionRef = useRef<HTMLDivElement>(null)
 
   // Approval filter state
@@ -71,7 +70,8 @@ export default function Collaboration() {
   // Channel name validation state
   const [channelNameError, setChannelNameError] = useState('')
 
-
+  // Mention dropdown position state
+  const [, setMentionPosition] = useState({ top: 0, left: 0 })
 
   const handleFileClick = (file: DBFile) => {
     const { data, error } = supabase.storage.from('files').getPublicUrl(file.file_path)
@@ -558,29 +558,17 @@ export default function Collaboration() {
                                 onSelect={() => {
                                   if (confirm('确定要退出该频道吗？')) {
                                     // 实际退出频道逻辑
-                                    removeMember(currentUser.id, ch.id)
+                                    removeMember(currentUser.id)
                                       .then(() => {
                                         // 如果当前正在这个频道，切换到另一个
                                         if (activeChannel === ch.id) {
                                           const otherChannel = channels.find(c => c.id !== ch.id)
                                           setActiveChannel(otherChannel?.id || null)
                                         }
-                                        addNotification({
-                                          type: 'info',
-                                          title: '已退出频道',
-                                          message: `你已成功退出「${ch.name}」频道`,
-                                          read: false,
-                                          created_at: new Date().toISOString(),
-                                        })
+                                        addNotification(currentUser.id, '已退出频道', `你已成功退出「${ch.name}」频道`, 'info')
                                       })
                                       .catch(() => {
-                                        addNotification({
-                                          type: 'error',
-                                          title: '退出失败',
-                                          message: '无法退出频道，请稍后重试',
-                                          read: false,
-                                          created_at: new Date().toISOString(),
-                                        })
+                                        addNotification(currentUser.id, '退出失败', '无法退出频道，请稍后重试', 'error')
                                       })
                                   }
                                 }}
@@ -1315,76 +1303,6 @@ export default function Collaboration() {
               })()}
             </div>
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Module Merge Dialog */}
-      <Dialog open={mergeDialogOpen} onOpenChange={(v) => { if (!v) { setMergeDialogOpen(false); setMergeName(''); setSelectedForMerge([]); setMergeMode(false) } }}>
-        <DialogContent>
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <GitMerge className="w-5 h-5 text-purple-500" />
-              <DialogTitle>合并模块</DialogTitle>
-            </div>
-            <DialogDescription>
-              将选中的 {selectedForMerge.length} 个模块合并为一个新项目，合并后原模块保留，仅创建一个新项目汇总。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
-              <p className="text-xs font-medium text-gray-500 mb-2">选中的模块：</p>
-              {selectedForMerge.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-sm">
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.type === 'project' ? 'bg-blue-500' : 'bg-purple-400'}`} />
-                  <span className="truncate">{item.name}</span>
-                  <Badge variant="secondary" className="text-[10px] shrink-0">
-                    {item.type === 'project' ? '项目' : '其他'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">新项目名称 *</label>
-              <Input
-                placeholder="例如：Q3季度总结合并"
-                value={mergeName}
-                onChange={e => setMergeName(e.target.value)}
-              />
-              {mergeName.trim().length > 0 && mergeName.trim().length < 2 && (
-                <p className="text-xs text-red-500 mt-1">项目名称至少2个字符</p>
-              )}
-            </div>
-            <div className="bg-amber-50 rounded-lg p-2 text-xs text-amber-700">
-              ⚠️ 合并仅创建汇总项目，原有模块不会被删除或修改。
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setMergeDialogOpen(false); setMergeName('') }}>取消</Button>
-            <Button
-              className="bg-purple-600 hover:bg-purple-700"
-              disabled={mergeName.trim().length < 2 || selectedForMerge.length < 2}
-              onClick={async () => {
-                if (mergeName.trim().length < 2 || selectedForMerge.length < 2) return
-                try {
-                  const { addProject } = useStore.getState()
-                  await addProject({
-                    name: mergeName.trim(),
-                    description: `由 ${selectedForMerge.length} 个模块合并而成：` + selectedForMerge.map(s => s.name).join('、'),
-                    status: 'active',
-                  })
-                  toast({ title: '模块合并成功', description: `已创建「${mergeName.trim()}」项目`, variant: 'success' })
-                  setMergeDialogOpen(false)
-                  setMergeName('')
-                  setSelectedForMerge([])
-                  setMergeMode(false)
-                } catch (err: any) {
-                  toast({ title: '合并失败', description: err?.message || '未知错误', variant: 'destructive' })
-                }
-              }}
-            >
-              <Merge className="w-4 h-4 mr-1" />确认合并
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

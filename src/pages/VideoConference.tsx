@@ -133,83 +133,126 @@ export default function VideoConference() {
 
   // 获取 LiveKit Token
   const getToken = async (roomName: string, action: 'join' | 'create'): Promise<{ token: string; url: string } | null> => {
-    try {
-      // 从 localStorage 读取 LiveKit 配置，传给 Edge Function 以绕过数据库依赖
-      const savedConfig = localStorage.getItem(LIVEKIT_CONFIG_KEY)
-      let clientConfig = {}
-      if (savedConfig) {
-        try {
-          const parsed = JSON.parse(savedConfig)
-          if (parsed.url && parsed.apiKey && parsed.apiSecret) {
-            clientConfig = {
-              serverUrl: parsed.url,
-              apiKey: parsed.apiKey,
-              apiSecret: parsed.apiSecret,
-            }
+    // 从 localStorage 读取 LiveKit 配置，传给 Edge Function 以绕过数据库依赖
+    const savedConfig = localStorage.getItem(LIVEKIT_CONFIG_KEY)
+    let clientConfig = {}
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig)
+        if (parsed.url && parsed.apiKey && parsed.apiSecret) {
+          clientConfig = {
+            serverUrl: parsed.url,
+            apiKey: parsed.apiKey,
+            apiSecret: parsed.apiSecret,
           }
-        } catch {}
-      }
+        }
+      } catch {}
+    }
 
-      const { data, error } = await supabase.functions.invoke('livekit-token', {
+    let data: any
+    let fnError: any
+
+    // Step 1: 调用 Edge Function，分离 data 和 error
+    try {
+      const result = await supabase.functions.invoke('livekit-token', {
         body: { roomName, action, ...clientConfig },
       })
-
-      if (error) throw error
-      // 检查返回的错误码
-      if (data?.error) {
-        const err = data as { error: string; code?: string; message?: string }
-        if (err.code === 'CONFIG_NOT_FOUND') {
-          toast({
-            title: 'LiveKit 未配置',
-            description: '请前往 设置 → 视频会议 配置 LiveKit Cloud 凭证',
-            variant: 'destructive'
-          })
-        } else if (err.code === 'CONFIG_INCOMPLETE') {
-          toast({
-            title: 'LiveKit 配置不完整',
-            description: '请检查 API Key、API Secret 和 Server URL 是否都已填写',
-            variant: 'destructive'
-          })
-        } else if (err.error?.includes('401') || err.error?.toLowerCase().includes('unauthorized')) {
-          toast({
-            title: 'LiveKit 凭证无效（401）',
-            description: '请检查 Settings → 视频会议 中的 LiveKit API Key 和 API Secret 是否正确',
-            variant: 'destructive'
-          })
-        } else {
-          toast({
-            title: '获取会议 Token 失败',
-            description: err.message || err.error || '请检查 LiveKit 配置',
-            variant: 'destructive'
-          })
-        }
-        return null
-      }
-      return data
+      data = result.data
+      fnError = result.error
     } catch (error: any) {
-      // 特殊处理 401 错误
+      // 网络级错误（fetch 失败）
       const errMsg = error?.message || ''
       if (errMsg.includes('401') || errMsg.toLowerCase().includes('unauthorized')) {
+        toast({ title: '认证失败', description: '登录状态已失效，请重新登录', variant: 'destructive' })
+      } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+        toast({ title: '无法连接服务器', description: '请检查网络连接', variant: 'destructive' })
+      } else {
+        toast({ title: '获取会议 Token 失败', description: errMsg || '网络错误', variant: 'destructive' })
+      }
+      return null
+    }
+
+    // Step 2: 【核心修复】处理 HTTP 错误（Edge Function 返回非 2xx 状态码）
+    // supabase.functions.invoke() 在非 2xx 时：
+    //   { data: null, error: FunctionsHttpError }
+    // FunctionsHttpError.context 是 Response 对象，FunctionsHttpError.message 不含状态码
+    if (fnError) {
+      const httpStatus = fnError?.context?.status ?? fnError?.status ?? 0
+      const errorMessage = fnError?.message || ''
+
+      if (httpStatus === 401 || errorMessage.toLowerCase().includes('unauthorized')) {
+        toast({ title: '认证失败（401）', description: '登录状态已失效，请重新登录', variant: 'destructive' })
+      } else if (httpStatus === 403) {
+        toast({ title: '无权限（403）', description: '无权限访问，请检查登录状态', variant: 'destructive' })
+      } else if (httpStatus === 404) {
+        // 尝试从响应 body 解析详细错误
+        let detail = '配置未找到，请前往 设置 → 视频会议 配置 LiveKit Cloud 凭证'
+        try {
+          const body = await fnError?.context?.json?.()
+          if (body?.code === 'CONFIG_NOT_FOUND') {
+            detail = '请前往 设置 → 视频会议 配置 LiveKit Cloud 凭证'
+          } else if (body?.message) {
+            detail = body.message
+          }
+        } catch {}
+        toast({ title: 'LiveKit 未配置（404）', description: detail, variant: 'destructive' })
+      } else if (httpStatus >= 500) {
+        toast({ title: '服务器错误（500）', description: '服务端异常，请稍后重试', variant: 'destructive' })
+      } else {
+        // 函数内部一般错误：尝试解析 body
+        let detail = errorMessage
+        try {
+          const body = await fnError?.context?.json?.()
+          if (body?.message) detail = body.message
+        } catch {}
+        toast({ title: '获取会议 Token 失败', description: detail || '未知错误', variant: 'destructive' })
+      }
+      return null
+    }
+
+    // Step 3: 处理应用层错误（Edge Function 返回 200 + { error: ... }）
+    if (data?.error) {
+      const appError = data as { error: string; code?: string; message?: string }
+      if (appError.code === 'CONFIG_NOT_FOUND') {
         toast({
-          title: 'LiveKit 凭证无效（401）',
-          description: '请检查 Settings → 视频会议 中的 LiveKit API Key 和 API Secret',
+          title: 'LiveKit 未配置',
+          description: '请前往 设置 → 视频会议 配置 LiveKit Cloud 凭证',
           variant: 'destructive'
         })
-      } else if (errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('NetworkError')) {
+      } else if (appError.code === 'CONFIG_INCOMPLETE') {
         toast({
-          title: '无法连接 LiveKit 服务器',
-          description: '请检查 Server URL 是否正确（需包含 https:// 前缀）',
+          title: 'LiveKit 配置不完整',
+          description: '请检查 API Key、API Secret 和 Server URL 是否都已填写',
           variant: 'destructive'
         })
       } else {
         toast({
           title: '获取会议 Token 失败',
-          description: error?.message || '请检查 LiveKit 配置',
+          description: appError.message || appError.error || '请检查 LiveKit 配置',
           variant: 'destructive'
         })
       }
       return null
     }
+
+    // Step 4: 【关键防御】token 类型校验：必须是字符串
+    if (!data || typeof data.token !== 'string' || data.token.trim() === '') {
+      console.error('[getToken] Token 无效:', data, '| token 类型:', typeof data?.token)
+      toast({
+        title: 'Token 获取失败',
+        description: '服务端返回了无效的 token，请检查控制台日志',
+        variant: 'destructive'
+      })
+      return null
+    }
+
+    // Step 5: 验证 URL 存在
+    if (!data.url || typeof data.url !== 'string') {
+      toast({ title: 'Server URL 缺失', description: '请检查 LiveKit Server URL 配置', variant: 'destructive' })
+      return null
+    }
+
+    return { token: data.token, url: data.url }
   }
 
   // 快速会议

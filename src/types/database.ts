@@ -45,6 +45,9 @@ export interface Profile {
   settings: Json
   email_change_count: number | null
   last_email_change_at: string | null
+  email_change_pending: string | null
+  email_change_token: string | null
+  email_change_token_exp: string | null
   created_at: string
   updated_at: string
 }

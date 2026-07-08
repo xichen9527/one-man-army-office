@@ -20,6 +20,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'))
 const Invite = lazy(() => import('@/pages/Invite'))
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
+const ConfirmEmail = lazy(() => import('@/pages/ConfirmEmail'))
 
 function LoadingFallback() {
   return (
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/register" element={<RedirectIfAuth><Suspense fallback={<LoadingFallback />}><ErrorBoundary><Register /></ErrorBoundary></Suspense></RedirectIfAuth>} />
         <Route path="/invite/:token" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Invite /></Suspense></ErrorBoundary>} />
         <Route path="/reset-password" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ResetPassword /></Suspense></ErrorBoundary>} />
+        <Route path="/confirm-email" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ConfirmEmail /></Suspense></ErrorBoundary>} />
 
         {/* 受保护路由 */}
         <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>

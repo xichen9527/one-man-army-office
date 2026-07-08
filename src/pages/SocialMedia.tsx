@@ -84,7 +84,7 @@ export default function SocialMedia() {
     socialAccounts, socialPosts, socialPostPlatforms, trendingTopics, currentUser,
     refreshTrendingTopics,
     addSocialAccount, updateSocialAccount, deleteSocialAccount,
-    initiateOAuth, publishPost,
+    initiateOAuth, publishPost, fetchSocialAccounts,
     addSocialPost, updateSocialPost, deleteSocialPost,
     addSocialPostPlatform, updateSocialPostPlatform, deleteSocialPostPlatform,
     syncSocialAccount,
