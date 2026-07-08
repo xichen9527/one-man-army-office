@@ -21,6 +21,15 @@ import TrendingMaterials from '@/components/social-media/TrendingMaterials'
 import type { SocialPostStatus } from '@/types/database'
 import type { SocialAccount, SocialPostPlatform } from '@/types/database'
 import { format, parseISO } from 'date-fns'
+import {
+  WeiboPreview,
+  BilibiliPreview,
+  XiaohongshuPreview,
+  DouyinPreview,
+  WechatPreview,
+  ZhihuPreview,
+  KuaishouPreview,
+} from '@/components/social-previews'
 
 const platformIcons: Record<string, { icon: string; color: string; bg: string }> = {
   weibo: { icon: '微博', color: 'text-red-500', bg: 'bg-red-50' },
@@ -879,68 +888,111 @@ export default function SocialMedia() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
           <DialogHeader><DialogTitle>创建内容</DialogTitle></DialogHeader>
           <div className="flex gap-6 min-h-[480px]">
-            {/* 左侧：预览区 */}
+            {/* 左侧：预览区 - 平台差异化预览 */}
             <div className="w-2/5 border rounded-lg p-4 bg-gray-50 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-gray-500">📱 内容预览</span>
                 {selectedPlatforms.length > 0 && (
                   <Badge variant="outline" className="text-xs">
-                    {selectedPlatforms.map(p => platformNames[p] || p).join('、')}
+                    已选 {selectedPlatforms.length} 个平台
                   </Badge>
                 )}
               </div>
-              <div className="bg-white rounded-lg border p-4 flex-1 overflow-y-auto">
-                {!pf.title && !pf.content && mediaFiles.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-300 text-sm gap-2">
-                    <svg className="w-12 h-12 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span>在右侧填写内容后</span>
-                    <span>这里将实时显示预览效果</span>
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                {selectedPlatforms.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-300 text-sm gap-2 bg-white rounded-lg border p-4">
+                    <svg className="w-12 h-12 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>在右侧选择平台并填写内容</span>
+                    <span>这里将显示真实的平台预览效果</span>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {/* 平台标识 */}
-                    {selectedPlatforms.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        {selectedPlatforms.slice(0, 4).map(p => {
-                          const pi = platformIcons[p]
-                          return pi ? <span key={p} className={`text-xs px-1.5 py-0.5 rounded ${pi.bg} ${pi.color}`}>{pi.icon}</span> : null
-                        })}
-                        {selectedPlatforms.length > 4 && <span className="text-xs text-gray-400">+{selectedPlatforms.length - 4}</span>}
-                      </div>
-                    )}
-                    {pf.title && (
-                      <h3 className="text-base font-bold text-gray-800 leading-snug">{pf.title}</h3>
-                    )}
-                    {pf.content && (
-                      <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                        {pf.content}
-                      </div>
-                    )}
-                    {mediaPreviews.length > 0 && (
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {mediaPreviews.slice(0, 6).map((preview, idx) => (
-                          <div key={idx} className="relative rounded overflow-hidden bg-gray-100">
-                            {mediaFiles[idx]?.type.startsWith('video/') ? (
-                              <video src={preview} className="w-full h-24 object-cover" />
-                            ) : (
-                              <img src={preview} className="w-full h-24 object-cover" alt="" />
-                            )}
-                          </div>
-                        ))}
-                        {mediaPreviews.length > 6 && (
-                          <div className="flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded h-24">
-                            +{mediaPreviews.length - 6}
+                  selectedPlatforms.map(platform => {
+                    const platformName = platformNames[platform] || platform
+                    const firstImage = mediaPreviews[0]
+                    const allImages = mediaPreviews
+                    
+                    return (
+                      <div key={platform} className="bg-white rounded-lg border p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-xs px-2 py-0.5 rounded ${platformIcons[platform]?.bg || 'bg-gray-50'} ${platformIcons[platform]?.color || 'text-gray-600'}`}>
+                            {platformIcons[platform]?.icon || platformName}
+                          </span>
+                          <span className="text-xs text-gray-400">预览</span>
+                        </div>
+                        
+                        {platform === 'weibo' && (
+                          <WeiboPreview 
+                            content={pf.content} 
+                            images={allImages}
+                            username={socialAccounts.find(a => a.platform === 'weibo')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'bilibili' && (
+                          <BilibiliPreview 
+                            title={pf.title}
+                            content={pf.content}
+                            coverImage={firstImage}
+                            username={socialAccounts.find(a => a.platform === 'bilibili')?.account_name}
+                            category={pf.category}
+                          />
+                        )}
+                        
+                        {platform === 'xiaohongshu' && (
+                          <XiaohongshuPreview 
+                            title={pf.title}
+                            content={pf.content}
+                            images={allImages}
+                            username={socialAccounts.find(a => a.platform === 'xiaohongshu')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'douyin' && (
+                          <DouyinPreview 
+                            content={pf.content}
+                            coverImage={firstImage}
+                            username={socialAccounts.find(a => a.platform === 'douyin')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'wechat' && (
+                          <WechatPreview 
+                            title={pf.title}
+                            content={pf.content}
+                            coverImage={firstImage}
+                            username={socialAccounts.find(a => a.platform === 'wechat')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'zhihu' && (
+                          <ZhihuPreview 
+                            title={pf.title}
+                            content={pf.content}
+                            images={allImages}
+                            username={socialAccounts.find(a => a.platform === 'zhihu')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'kuaishou' && (
+                          <KuaishouPreview 
+                            content={pf.content}
+                            coverImage={firstImage}
+                            username={socialAccounts.find(a => a.platform === 'kuaishou')?.account_name}
+                          />
+                        )}
+                        
+                        {platform === 'toutiao' && (
+                          <div className="p-4 text-center text-sm text-gray-400">
+                            头条预览（与微博类似）
+                            <div className="mt-2 text-xs">{pf.content.slice(0, 100)}...</div>
                           </div>
                         )}
                       </div>
-                    )}
-                    <div className="flex items-center gap-3 pt-2 border-t text-xs text-gray-400">
-                      <span>{charCount} 字符</span>
-                      <span>{mediaFiles.length} 媒体</span>
-                      {overLimit && <span className="text-red-500 font-medium">内容超限</span>}
-                      {contentWarnings.length > 0 && <span className="text-amber-500">{contentWarnings.length} 条警告</span>}
-                    </div>
-                  </div>
+                    )
+                  })
                 )}
               </div>
             </div>
