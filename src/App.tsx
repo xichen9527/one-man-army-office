@@ -21,6 +21,8 @@ const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'))
 const Invite = lazy(() => import('@/pages/Invite'))
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 const ConfirmEmail = lazy(() => import('@/pages/ConfirmEmail'))
+const AdminPage = lazy(() => import('@/pages/AdminPage'))
+const WorkspaceHub = lazy(() => import('@/pages/WorkspaceHub'))
 
 function LoadingFallback() {
   return (
@@ -109,6 +111,8 @@ export default function App() {
           <Route path="projects/:id" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><ProjectDetail /></Suspense></ErrorBoundary>} />
           <Route path="video-conference" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><VideoConference /></Suspense></ErrorBoundary>} />
           <Route path="settings" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><Settings /></Suspense></ErrorBoundary>} />
+          <Route path="admin" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><AdminPage /></Suspense></ErrorBoundary>} />
+          <Route path="workspace" element={<ErrorBoundary><Suspense fallback={<LoadingFallback />}><WorkspaceHub /></Suspense></ErrorBoundary>} />
         </Route>
 
         {/* 404 */}

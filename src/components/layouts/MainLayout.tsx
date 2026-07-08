@@ -13,7 +13,9 @@ const navItems = [
   { path: '/crm', label: '客户管理', icon: Users },
   { path: '/social-media', label: '自媒体运营', icon: Share2 },
   { path: '/video-conference', label: '视频会议', icon: Video },
-  { path: '/settings', label: '系统设置', icon: Settings }
+  { path: '/workspace', label: '工作空间', icon: Workspace },
+  { path: '/settings', label: '系统设置', icon: Settings },
+  { path: '/admin', label: '管理面板', icon: Shield }
 ];
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -25,6 +27,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Share2: ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>,
   Video: ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>,
   Settings: ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>,
+  Workspace: ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>,
+  Shield: ({ className }: { className?: string }) => <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
 };
 
 export default function MainLayout() {
@@ -163,7 +167,7 @@ export default function MainLayout() {
       {/* Sidebar */}
       <aside className={`fixed top-14 left-0 bottom-0 w-56 bg-white border-r border-slate-200/80 z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <nav className="p-3 space-y-0.5 overflow-y-auto h-full pb-20">
-          {navItems.map((item) => {
+          {navItems.filter((item) => item.path !== '/admin' || currentUser?.role === 'admin').map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             const IconComponent = iconMap[item.icon];
             return (
