@@ -1350,7 +1350,7 @@ export const useStore = create<AppState>((set, get) => ({
         mime_type: file.type || null,
         project_id: projectId || null,
         task_id: taskId || null,
-        uploaded_by: user.user.id,
+        uploader_id: user.user.id,
         is_public: true,
         metadata: {},
       } as any).select().single()

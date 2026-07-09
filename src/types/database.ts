@@ -396,10 +396,10 @@ export interface DBFile {
   mime_type: string | null
   project_id: string | null
   task_id: string | null
-  uploaded_by: string | null
+  uploader_id: string | null
   is_public: boolean
   metadata: Json
   created_at: string
 }
 export type DBFileInsert = Omit<DBFile, 'id' | 'created_at'>
-export type DBFileUpdate = Partial<Omit<DBFile, 'id' | 'uploaded_by' | 'created_at'>>
+export type DBFileUpdate = Partial<Omit<DBFile, 'id' | 'uploader_id' | 'created_at'>>
