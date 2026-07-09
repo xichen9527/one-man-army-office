@@ -397,7 +397,6 @@ export interface DBFile {
   project_id: string | null
   task_id: string | null
   uploader_id: string | null
-  is_public: boolean
   metadata: Json
   created_at: string
 }

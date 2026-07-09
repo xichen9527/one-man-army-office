@@ -1351,7 +1351,6 @@ export const useStore = create<AppState>((set, get) => ({
         project_id: projectId || null,
         task_id: taskId || null,
         uploader_id: user.user.id,
-        is_public: true,
         metadata: {},
       } as any).select().single()
       if (error) { toast.error('uploadFile db error:: ' + (error?.message || 'uploadFile db error:')); return null }
