@@ -1380,8 +1380,9 @@ export const useStore = create<AppState>((set, get) => ({
   // ========== Realtime Subscriptions ==========
   subscribeToMessages: (channelId: string) => {
     get().unsubscribeMessages()
+    // 使用唯一后缀避免与未完成移除的旧 channel 冲突（Supabase removeChannel 是异步的）
     const ch = supabase
-      .channel(`messages:${channelId}`)
+      .channel(`messages:${channelId}:${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

@@ -1,0 +1,45 @@
+[36mvite v8.0.14 [32mbuilding client environment for production...[36m[39m
+[2Ktransforming...✓ 2914 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/__/one-man-army-office/index.html       1.97 kB │ gzip:   0.83 kB
+dist/assets/vendor-livekit-BXwiMiGA.css     19.30 kB │ gzip:   4.19 kB
+dist/assets/index-Ct4xPN3k.css              53.38 kB │ gzip:   9.51 kB
+dist/assets/label-pYpNFtgz.js                0.44 kB │ gzip:   0.30 kB
+dist/assets/rolldown-runtime-b3L32Ng1.js     0.69 kB │ gzip:   0.42 kB
+dist/assets/input-B2gAQnd8.js                0.69 kB │ gzip:   0.42 kB
+dist/assets/checkbox-B5LZaN8a.js             0.74 kB │ gzip:   0.44 kB
+dist/assets/badge-C7XciK1B.js                0.87 kB │ gzip:   0.46 kB
+dist/assets/scroll-area-J3PsNrN8.js          0.93 kB │ gzip:   0.48 kB
+dist/assets/switch-pVmtSjby.js               0.93 kB │ gzip:   0.50 kB
+dist/assets/tabs-6GOHDvqK.js                 1.21 kB │ gzip:   0.52 kB
+dist/assets/toast-DPBTXacd.js                1.29 kB │ gzip:   0.74 kB
+dist/assets/dialog-D3cKYyPS.js               2.29 kB │ gzip:   0.89 kB
+dist/assets/ConfirmEmail-B7kHfl1c.js         3.64 kB │ gzip:   1.50 kB
+dist/assets/Login-C3h3bmUH.js                4.17 kB │ gzip:   1.75 kB
+dist/assets/ResetPassword-CyvaFgR0.js        4.83 kB │ gzip:   1.99 kB
+dist/assets/Register-CfHS1z8j.js             5.04 kB │ gzip:   1.98 kB
+dist/assets/Invite-BndcNAFe.js               6.62 kB │ gzip:   2.53 kB
+dist/assets/ProjectDetail-B4cbsXTs.js       11.17 kB │ gzip:   2.88 kB
+dist/assets/VideoConference-DD8-K5aV.js     14.02 kB │ gzip:   4.54 kB
+dist/assets/Dashboard-Bk7vJr7z.js           15.64 kB │ gzip:   4.77 kB
+dist/assets/AdminPage-hVyHONLd.js           19.45 kB │ gzip:   4.95 kB
+dist/assets/AIAssistant-BKS-oXqw.js         19.95 kB │ gzip:   6.86 kB
+dist/assets/vendor-icons-wj8SS16j.js        29.82 kB │ gzip:  10.93 kB
+dist/assets/vendor-utils-DW1QYA7e.js        30.23 kB │ gzip:   9.22 kB
+dist/assets/CRM-C3XmhU7F.js                 30.24 kB │ gzip:   7.96 kB
+dist/assets/button-C637ecHH.js              30.42 kB │ gzip:   9.81 kB
+dist/assets/Settings-CV7isq97.js            32.50 kB │ gzip:  10.23 kB
+dist/assets/Collaboration-BW7OK07S.js       36.09 kB │ gzip:   9.45 kB
+dist/assets/WorkspaceHub-C6n4lZAm.js        38.39 kB │ gzip:  10.18 kB
+dist/assets/core.esm-JQ2EXVyF.js            42.97 kB │ gzip:  14.39 kB
+dist/assets/ProjectManagement-uQhO5SNe.js   55.61 kB │ gzip:  12.60 kB
+dist/assets/SocialMedia-e3oaok4h.js         63.22 kB │ gzip:  17.09 kB
+dist/assets/index-BiSZZhjE.js               90.64 kB │ gzip:  23.66 kB
+dist/assets/vendor-radix-Ckx5LRKX.js       114.79 kB │ gzip:  36.66 kB
+dist/assets/lib-hT3ZkRbM.js                117.29 kB │ gzip:  36.26 kB
+dist/assets/vendor-supabase-Bs4vCFQ7.js    193.64 kB │ gzip:  51.48 kB
+dist/assets/vendor-react-CJ1BPZbC.js       224.17 kB │ gzip:  72.88 kB
+dist/assets/vendor-livekit-CeIn9Ga3.js     615.23 kB │ gzip: 168.28 kB
+
+[32m✓ built in 790ms[39m
