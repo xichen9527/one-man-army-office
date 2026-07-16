@@ -237,7 +237,6 @@ export default function VideoConference() {
 
     // Step 4: 【关键防御】token 类型校验：必须是字符串
     if (!data || typeof data.token !== 'string' || data.token.trim() === '') {
-      console.error('[getToken] Token 无效:', data, '| token 类型:', typeof data?.token)
       toast({
         title: 'Token 获取失败',
         description: '服务端返回了无效的 token，请检查控制台日志',
@@ -476,7 +475,7 @@ export default function VideoConference() {
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    onClick={() => handleJoinFromList(conf.room_name)}
+                    onClick={() => handleJoinFromList(conf.meeting_id)}
                     disabled={connecting}
                   >
                     {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : '加入'}
@@ -484,7 +483,7 @@ export default function VideoConference() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => copyMeetingLink(conf.room_name)}
+                    onClick={() => copyMeetingLink(conf.meeting_id)}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>

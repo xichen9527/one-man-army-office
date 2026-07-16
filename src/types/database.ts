@@ -148,7 +148,7 @@ export interface Notification {
   title: string
   content: string | null
   type: 'system' | 'task' | 'project' | 'message' | 'ai' | 'crm' | 'social' | 'conference'
-  read: boolean
+  is_read: boolean
   action_url: string | null
   metadata: Json
   created_at: string
@@ -279,13 +279,15 @@ export interface SocialAccount {
 export type SocialAccountInsert = Omit<SocialAccount, 'id' | 'created_at' | 'updated_at'>
 export type SocialAccountUpdate = Partial<Omit<SocialAccount, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
 
+export type SocialPostStatus = 'draft' | 'scheduled' | 'published' | 'failed'
+
 export interface SocialPost {
   id: string
   account_id: string | null
   title: string | null
   content: string
   platform: string | null // 已废弃：请使用 social_post_platforms 关联表
-  status: 'draft' | 'scheduled' | 'published' | 'failed'
+  status: SocialPostStatus
   scheduled_at: string | null
   published_at: string | null
   post_url: string | null

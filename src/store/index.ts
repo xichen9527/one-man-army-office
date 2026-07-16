@@ -523,7 +523,7 @@ export const useStore = create<AppState>((set, get) => ({
   addNotification: async (userId, title, content, type) => {
     try {
       const { data } = await supabase.from('notifications').insert({
-        user_id: userId, title, content, type, read: false,
+        user_id: userId, title, content, type, is_read: false,
       } as any).select().single()
       if (data) set((s) => ({ notifications: [data as Notification, ...s.notifications] }))
     } catch (e) { toast.error('addNotification failed: ' + (e?.message || 'addNotification failed:')) }
@@ -1046,7 +1046,7 @@ export const useStore = create<AppState>((set, get) => ({
         body: JSON.stringify({}),
       })
       if (!res.ok) { 
-        toast.error('refreshTrendingTopics: Edge Function error', res.status)
+        toast.error('refreshTrendingTopics: Edge Function error (' + res.status + ')')
         throw new Error(`Edge Function 调用失败: ${res.status}`)
       }
       const result = await res.json()
@@ -1116,6 +1116,20 @@ export const useStore = create<AppState>((set, get) => ({
   },
   addSocialPost: async (p) => {
     try {
+      // 如果未提供 account_id，从当前用户的第一个社交账号获取
+      if (!(p as any).account_id) {
+        const { data: user } = await getCachedUser()
+        if (user?.user) {
+          const { data: accounts } = await supabase
+            .from('social_accounts')
+            .select('id')
+            .eq('user_id', user.user.id)
+            .limit(1)
+          if (accounts && accounts.length > 0) {
+            (p as any).account_id = accounts[0].id
+          }
+        }
+      }
       const { data } = await supabase.from('social_media_posts').insert(p as any).select().single()
       if (data) set((s) => ({ socialPosts: [data as SocialPost, ...s.socialPosts] }))
       return data?.id || null
@@ -1260,16 +1274,16 @@ export const useStore = create<AppState>((set, get) => ({
   },
   markNotificationRead: async (id) => {
     try {
-      await supabase.from('notifications').update({ read: true } as any).eq('id', id)
-      set((s) => ({ notifications: s.notifications.map((n: Notification) => n.id === id ? { ...n, read: true } : n) }))
+      await supabase.from('notifications').update({ is_read: true } as any).eq('id', id)
+      set((s) => ({ notifications: s.notifications.map((n: Notification) => n.id === id ? { ...n, is_read: true } : n) }))
     } catch (e) { toast.error('markNotificationRead failed: ' + (e?.message || 'markNotificationRead failed:')) }
   },
   markAllNotificationsRead: async () => {
     try {
       const { data: user } = await getCachedUser()
       if (!user.user) return
-      await supabase.from('notifications').update({ read: true } as any).eq('user_id', user.user.id).eq('read', false)
-      set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, read: true })) }))
+      await supabase.from('notifications').update({ is_read: true } as any).eq('user_id', user.user.id).eq('is_read', false)
+      set((s) => ({ notifications: s.notifications.map((n: Notification) => ({ ...n, is_read: true })) }))
     } catch (e) { toast.error('markAllNotificationsRead failed: ' + (e?.message || 'markAllNotificationsRead failed:')) }
   },
 
@@ -1341,7 +1355,7 @@ export const useStore = create<AppState>((set, get) => ({
       const { error: uploadError } = await supabase.storage
         .from('files')
         .upload(filePath, file, { cacheControl: '3600', upsert: false })
-      if (uploadError) { toast.error('uploadFile storage error:', uploadError); return null }
+      if (uploadError) { toast.error('uploadFile storage error: ' + (uploadError?.message || '')); return null }
       onProgress?.(100)
       const { data, error } = await supabase.from('files').insert({
         name: file.name,
@@ -1353,7 +1367,7 @@ export const useStore = create<AppState>((set, get) => ({
         uploader_id: user.user.id,
         metadata: {},
       } as any).select().single()
-      if (error) { toast.error('uploadFile db error:: ' + (error?.message || 'uploadFile db error:')); return null }
+      if (error) { toast.error('uploadFile db error: ' + (error?.message || 'uploadFile db error:')); return null }
       if (data) set((s) => ({ files: [data as DBFile, ...s.files] }))
       return data as DBFile | null
     } catch (e) { toast.error('uploadFile failed: ' + (e?.message || 'uploadFile failed:')); return null }

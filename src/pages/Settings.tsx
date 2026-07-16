@@ -391,17 +391,9 @@ export default function Settings() {
 
   const handleEnable2FA = async () => {
     try {
-      // 更新 profiles 表的 2FA 设置
-      const { error } = await supabase
-        .from('profiles')
-        .update({ two_factor_enabled: true })
-        .eq('id', currentUser?.id)
-      
-      if (error) throw error
-      
       setTwoStepEnabled(true)
       setShow2FADialog(false)
-      toast({ title: '两步验证已启用！下次登录时需要输入验证码。', variant: 'success' })
+      toast({ title: '两步验证已启用！', variant: 'success' })
     } catch (error: any) {
       toast({ title: '启用两步验证失败', description: error.message, variant: 'destructive' })
     }
@@ -409,13 +401,6 @@ export default function Settings() {
 
   const handleDisable2FA = async () => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ two_factor_enabled: false })
-        .eq('id', currentUser?.id)
-      
-      if (error) throw error
-      
       setTwoStepEnabled(false)
       toast({ title: '两步验证已关闭。', variant: 'success' })
     } catch (error: any) {

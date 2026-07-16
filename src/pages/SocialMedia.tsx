@@ -46,6 +46,7 @@ const postStatusLabels: Record<SocialPostStatus, { label: string; color: string 
   draft: { label: '草稿', color: 'bg-gray-100 text-gray-600' },
   scheduled: { label: '已预约', color: 'bg-blue-100 text-blue-700' },
   published: { label: '已发布', color: 'bg-green-100 text-green-700' },
+  failed: { label: '发布失败', color: 'bg-red-100 text-red-700' },
 }
 
 const platformNames: Record<string, string> = {
